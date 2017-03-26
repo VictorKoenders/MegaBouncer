@@ -1,9 +1,10 @@
 use super::{ActionType, Channel, Component, ComponentResponse, ComponentWrapper, Message};
 use mio::{Events, Poll, PollOpt, Ready, Token};
+use super::writeable::{Writeable, WriteQueue};
 use serde_json::{from_str, Value};
 use std::collections::VecDeque;
-use std::io::{Read, Write};
 use mio::tcp::TcpStream;
+use std::io::Read;
 
 pub struct Client {
     components: Vec<ComponentWrapper>,
@@ -13,7 +14,7 @@ pub struct Client {
     message_queue: VecDeque<Message>,
     message_queue_bytes: Vec<u8>,
     incoming_buffer: String,
-    writable: bool,
+    writeable: bool,
     running: bool,
     name: Option<String>,
 }
@@ -28,7 +29,7 @@ impl Default for Client {
             message_queue: VecDeque::new(),
             message_queue_bytes: Vec::new(),
             incoming_buffer: String::new(),
-            writable: false,
+            writeable: false,
             running: true,
             name: None,
         }
@@ -97,40 +98,7 @@ impl Client {
         let did_add_messages = messages_to_send.len() > 0;
         self.message_queue.extend(messages_to_send.into_iter());
         if did_add_messages {
-            self.try_write_messages(false);
-        }
-    }
-
-    fn try_write_messages(&mut self, force_writable: bool) {
-        if force_writable {
-            self.writable = true;
-        }
-        if !self.writable { return; }
-        loop {
-            if self.message_queue_bytes.len() > 0 {
-                if let Some(ref mut stream) = self.stream {
-                    match stream.write(&self.message_queue_bytes) {
-                        Ok(length) => {
-                            self.message_queue_bytes.drain(..length);
-                            if self.message_queue_bytes.len() > 0 {
-                                println!("Could not write full queue, retrying again next time");
-                                self.writable = false;
-                                return;
-                            }
-                        },
-                        Err(e) => {
-                            println!("Could not write to stream: {:?}", e);
-                            self.writable = false;
-                            return;
-                        }
-                    }
-                }
-            } else if let Some(message) = self.message_queue.pop_front() {
-                self.message_queue_bytes.extend(message.to_bytes().unwrap().into_iter());
-                self.message_queue_bytes.extend(b"\n");
-            } else {
-                break;
-            }
+            self.try_write();
         }
     }
 
@@ -238,7 +206,8 @@ impl Client {
                 let readiness = event.readiness();
                 if event.token() == Token(0) {
                     if readiness.is_writable() {
-                        self.try_write_messages(true);
+                        self.writeable = true;
+                        self.try_write();
                     }
                     if readiness.is_readable(){
                         let messages = self.try_read_message();
@@ -257,6 +226,17 @@ impl Client {
                     });
                 }
             }
+        }
+    }
+}
+
+impl Writeable<Message> for Client {
+    fn get_write_queue(&mut self) -> WriteQueue<Message> {
+        WriteQueue {
+            byte_queue: &mut self.message_queue_bytes,
+            message_queue: &mut self.message_queue,
+            stream: self.stream.as_mut().unwrap(),
+            writeable: &mut self.writeable,
         }
     }
 }

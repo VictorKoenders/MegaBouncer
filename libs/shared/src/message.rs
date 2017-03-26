@@ -2,7 +2,7 @@ use serde_json::{Map, Value, to_vec};
 use std::error::Error as StdError;
 use super::error::{Error, Result};
 use super::{ActionType, Channel};
-use std::convert::From;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
 pub struct Message {
@@ -11,24 +11,32 @@ pub struct Message {
     pub data: Value,
 }
 
-impl Message {
-    // pub fn new() -> Message {
-    //     Message {
-    //         action: None,
-    //         channel: None,
-    //         data: Value::Null,
-    //     }
-    // }
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+impl TryFrom<Message> for Vec<u8> {
+    type Error = super::error::Error;
+
+    fn try_from(message: Message) -> Result<Vec<u8>> {
         let mut obj = Map::new();
-        obj.insert(String::from("action"), Value::String(self.action.to_string()));
-        if let Some(ref channel) = self.channel {
+        obj.insert(String::from("action"), Value::String(message.action.to_string()));
+        if let Some(ref channel) = message.channel {
             obj.insert("channel".to_owned(), Value::String(channel.to_string()));
         }
-        obj.insert("data".to_owned(), self.data.clone());
+        obj.insert("data".to_owned(), message.data.clone());
         let json = Value::Object(obj);
         to_vec(&json).map_err(From::from)
     }
+}
+
+impl Message {
+    // pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    //     let mut obj = Map::new();
+    //     obj.insert(String::from("action"), Value::String(self.action.to_string()));
+    //     if let Some(ref channel) = self.channel {
+    //         obj.insert("channel".to_owned(), Value::String(channel.to_string()));
+    //     }
+    //     obj.insert("data".to_owned(), self.data.clone());
+    //     let json = Value::Object(obj);
+    //     to_vec(&json).map_err(From::from)
+    // }
 
     pub fn from_error<E: StdError>(error: E) -> Message {
         let mut obj = Map::new();

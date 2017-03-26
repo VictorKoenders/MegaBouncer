@@ -1,9 +1,11 @@
 #![deny(warnings)]
+#![feature(try_from)]
 
 extern crate serde_json;
 extern crate mio;
 
 mod component_wrapper;
+pub mod writeable;
 mod component;
 mod message;
 mod channel;

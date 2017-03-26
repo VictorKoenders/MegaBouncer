@@ -1,8 +1,9 @@
+use shared::writeable::{Writeable, WriteQueue};
 use shared::{ActionType, Channel,  Message};
 use std::collections::VecDeque;
 use serde_json::{self, Value};
 use shared::{Error, Result};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::SocketAddr;
 use mio::tcp::TcpStream;
 use std::convert::From;
@@ -11,7 +12,7 @@ pub struct Client {
     socket: TcpStream,
     pub address: SocketAddr,
     name: Option<String>,
-    writable: bool,
+    writeable: bool,
     readable: bool,
     buffer: Vec<u8>,
 
@@ -26,7 +27,7 @@ impl Client {
             socket: socket,
             address: address,
             name: None,
-            writable: false,
+            writeable: false,
             readable: false,
             buffer: Vec::new(),
             channels: Vec::new(),
@@ -40,12 +41,11 @@ impl Client {
     }
 
     pub fn set_writable(&mut self, is_writable: bool) {
-        self.writable = is_writable;
-        if self.writable {
-            self.process_write_queue();
-        }
+        self.writeable = is_writable;
+        self.try_write();
     }
 
+    /*
     fn process_write_queue(&mut self) {
         if !self.writable { return; }
         loop {
@@ -71,7 +71,7 @@ impl Client {
             }
         }
 
-    }
+    }*/
 
     pub fn is_listening_to(&self, channel: &Channel) -> bool {
         self.channels.iter().any(|c| c.matches(channel))
@@ -79,9 +79,7 @@ impl Client {
 
     pub fn write(&mut self, message: Message) {
         self.write_buffer.push_back(message);
-        if self.writable {
-            self.process_write_queue();
-        }
+        self.try_write();
     }
 
     pub fn emit_simple_error<T: ToString>(&mut self, str: T) {
@@ -259,6 +257,17 @@ impl Client {
                     };
                 }
             }
+        }
+    }
+}
+
+impl Writeable<Message> for Client {
+    fn get_write_queue(&mut self) -> WriteQueue<Message> {
+        WriteQueue {
+            byte_queue: &mut self.write_buffer_bytes,
+            message_queue: &mut self.write_buffer,
+            stream: &mut self.socket,
+            writeable: &mut self.writeable,
         }
     }
 }
