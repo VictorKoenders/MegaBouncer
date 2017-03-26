@@ -22,24 +22,12 @@ impl ToString for Channel {
 impl PartialEq<String> for Channel {
     fn eq(&self, other: &String) -> bool {
         self.raw.eq(other)
-        // let split = other.split('.').collect::<Vec<_>>();
-        // if split.len() != self.parts.len() { return false; }
-        // for i in 0..split.len() {
-        //     if self.parts[i] != split[i] { return false; }
-        // }
-        // return true;
     }
 }
 
 impl PartialEq<str> for Channel {
     fn eq(&self, other: &str) -> bool {
         self.raw.eq(other)
-        // let split = other.split('.').collect::<Vec<_>>();
-        // if split.len() != self.parts.len() { return false; }
-        // for i in 0..split.len() {
-        //     if self.parts[i] != split[i] { return false; }
-        // }
-        // return true;
     }
 }
 
@@ -48,7 +36,6 @@ impl Channel {
         Channel {
             parts: string.to_string().split('.').map(String::from).collect(),
             raw: string.to_string(),
-            //raw: string
         }
     }
 

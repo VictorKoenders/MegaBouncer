@@ -45,34 +45,6 @@ impl Client {
         self.try_write();
     }
 
-    /*
-    fn process_write_queue(&mut self) {
-        if !self.writable { return; }
-        loop {
-            if self.write_buffer_bytes.len() > 0 {
-                match self.socket.write(&self.write_buffer_bytes) {
-                    Ok(length) => {
-                        self.write_buffer_bytes.drain(..length);
-                        if self.write_buffer_bytes.len() > 0 {
-                            println!("Could not write full queue, retrying again next time");
-                            self.writable = false;
-                            return;
-                        }
-                    },
-                    Err(e) => {
-                        panic!("Could not write to stream: {:?}", e);
-                    }
-                }
-            } else if let Some(message) = self.write_buffer.pop_front() {
-                self.write_buffer_bytes.extend(message.to_bytes().unwrap().into_iter());
-                self.write_buffer_bytes.extend(b"\n");
-            } else {
-                break;
-            }
-        }
-
-    }*/
-
     pub fn is_listening_to(&self, channel: &Channel) -> bool {
         self.channels.iter().any(|c| c.matches(channel))
     }
@@ -138,7 +110,7 @@ impl Client {
         if !self.has_name() {
             return Ok(())
         }
-        let channel: Channel = match message.channel {
+        let channel = match message.channel {
             None => {
                 self.write_buffer.push_back(Message::from_error_string("Channel required with ForgetListener action"));
                 return Ok(());
