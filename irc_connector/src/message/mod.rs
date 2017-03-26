@@ -9,7 +9,8 @@ pub enum Message {
     Pong(String),
     Notice(Sender, Target, String),
     Privmsg(Sender, Target, String),
-    Numeric(Sender, u16, String)
+    Numeric(Sender, u16, String),
+    Mode(Sender, Target, Vec<char>),
 }
 
 impl Message {
@@ -49,7 +50,7 @@ impl Message {
             }
         };
         let remaining = iter.map(|str| format!("{} ", str)).collect::<String>();
-        let remaining = String::from(&remaining[1..]);
+        let remaining = if let Some(b':') = remaining.bytes().next() { String::from(&remaining[1..]) } else { remaining };
 
         if line_type == "PRIVMSG" {
             Some(Message::Privmsg(from, target, remaining))
@@ -57,6 +58,8 @@ impl Message {
             Some(Message::Numeric(from, nr, remaining))
         } else if line_type == "NOTICE" {
             Some(Message::Notice(from, target, remaining))
+        } else if line_type == "MODE" {
+            Some(Message::Mode(from, target, remaining.trim().chars().skip(1).collect()))
         } else {
             println!("Unknown line type {:?}", line_type);
             None
@@ -70,7 +73,8 @@ impl ToString for Message {
             &Message::Ping(ref str) => format!("PING {}", str),
             &Message::Pong(ref str) => format!("PONG {}", str),
             &Message::Notice(_, ref target, ref message) => format!("NOTICE {} :{}", target.to_string(), message),
-            &Message::Privmsg(_, ref target, ref message) => format!("PRIVMSG {}: {}", target.to_string(), message),
+            &Message::Privmsg(_, ref target, ref message) => format!("PRIVMSG {} :{}", target.to_string(), message),
+            &Message::Mode(_, ref target, ref modes) => format!("MODE {} +{}", target.to_string(), modes.iter().collect::<String>()),
             &Message::Numeric(_, ref _number, ref _message) => unreachable!()
         }
     }

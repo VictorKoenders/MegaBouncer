@@ -59,7 +59,8 @@ impl TcpClient {
                 Ok(length) => {
                     buffer_vec.extend(&buffer[0..length]);
                 },
-                Err(_) => {
+                Err(e) => {
+                    println!("Could not read: {:?}", e);
                     let host = self.host.clone();
                     if buffer_vec.len() > 0 {
                         response.push(ComponentResponse::Send(Message::new_emit("tcp.data", |map| {
