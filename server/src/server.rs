@@ -28,7 +28,7 @@ pub fn get_time() -> String {
 impl Server {
     pub fn new(host: &str, port: u16) -> Result<Server> {
         let address = &format!("{}:{}", host, port).parse()?;
-        let listener = TcpListener::bind(&address)?;
+        let listener = TcpListener::bind(address)?;
         let poll = Poll::new()?;
         let events = Events::with_capacity(1024);
         //let timer = Timer::default();
@@ -101,7 +101,7 @@ impl Server {
                 }
             }
 
-            for error in errors.into_iter() {
+            for error in errors {
                 if let Some(client) = self.clients.remove(&error.1) {
                     self.log_client_error(client, error.0);
                 } else {
@@ -118,7 +118,7 @@ impl Server {
     // }
 
     fn handle_client_events(&mut self, token: &Token, events: Vec<ClientEvent>) {
-        for event in events.into_iter() {
+        for event in events {
             match event {
                 ClientEvent::Disconnect => {
                     if let Some(client) = self.clients.remove(token) {

@@ -53,7 +53,7 @@ impl Client {
             let mut channel_modifications = Vec::new();
             {
                 let result = callback(component, &self.poll);
-                for result in result.into_iter() {
+                for result in result {
                     match result {
                         ComponentResponse::StopListeningToChannel(channel) => {
                             messages_to_send.push_back(Message::new_forget_listener(&channel));
@@ -80,7 +80,7 @@ impl Client {
                     }
                 }
             }
-            for channel_modification in channel_modifications.into_iter() {
+            for channel_modification in channel_modifications {
                 match channel_modification {
                     ChannelDiff::Add(channel) => {
                         component.channels.retain(|c| !channel.matches(c));
@@ -92,10 +92,10 @@ impl Client {
                 }
             }
         }
-        for component in components_to_add.into_iter() {
+        for component in components_to_add {
             self.components.push(ComponentWrapper::from_component(component));
         }
-        let did_add_messages = messages_to_send.len() > 0;
+        let did_add_messages = !messages_to_send.is_empty();
         self.message_queue.extend(messages_to_send.into_iter());
         if did_add_messages {
             self.try_write();
@@ -117,11 +117,8 @@ impl Client {
                 }
             },
             ActionType::Identify => {
-                match message.data.as_object().map(|o| o.get("name")) {
-                    Some(Some(&Value::String(ref str))) => {
-                        self.execute(|component, poll| component.component.node_connected(poll, str))
-                    },
-                    _ => {}
+                if let Some(Some(&Value::String(ref str))) = message.data.as_object().map(|o| o.get("name")) {
+                    self.execute(|component, poll| component.component.node_connected(poll, str));
                 }
             }
             _ => {
@@ -160,7 +157,7 @@ impl Client {
 
                 while let Some(index) = self.incoming_buffer.chars().position(|c| c == '\n') {
                     let str = self.incoming_buffer.drain(0..index + 1).take(index).collect::<String>();
-                    match from_str(&str).map(|json| Message::from_json(json)) {
+                    match from_str(&str).map(Message::from_json) {
                         Ok(Ok(message)) => {
                             messages.push(message);
                         },
@@ -212,7 +209,7 @@ impl Client {
                     if readiness.is_readable(){
                         let messages = self.try_read_message();
                         
-                        for message in messages.into_iter(){
+                        for message in messages {
                             self.handle_message(message);
                         }
                     }

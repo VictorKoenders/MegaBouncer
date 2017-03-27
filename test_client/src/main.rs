@@ -23,7 +23,7 @@ impl shared::Component for LoggingComponent {
         println!("Received {:?}: {:?}", channel, message);
         Vec::new()
     }
-    fn node_connected(&mut self, _poll: &Poll, name: &String) -> Vec<ComponentResponse>{
+    fn node_connected(&mut self, _poll: &Poll, name: &str) -> Vec<ComponentResponse>{
         println!("Node {:?} connected", name);
         Vec::new()
     }

@@ -1,0 +1,9 @@
+cd server
+cargo build
+cd ../tcp_connector
+cargo build
+cd ../irc_connector
+cargo build
+cd ../test_client
+cargo build
+cd ../

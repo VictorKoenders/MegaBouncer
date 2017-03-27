@@ -18,6 +18,7 @@ pub use error::{Error, Result};
 pub use message::Message;
 pub use channel::Channel;
 pub use client::Client;
+use std::str::FromStr;
 
 pub const ACTION_NAME: &'static str = "action";
 
@@ -52,10 +53,12 @@ pub enum ActionType {
     Emit,
 }
 
-impl ActionType {
-    pub fn from_str(str: &str) -> Option<ActionType> {
+impl FromStr for ActionType {
+    type Err = ();
+    
+    fn from_str(str: &str) -> std::result::Result<ActionType, ()> {
         let types = ActionType::default_types();
-        Some(match str {
+        Ok(match str {
             x if x == types[0] => ActionType::RegisterListener,
             x if x == types[1] => ActionType::ForgetListener,
             x if x == types[2] => ActionType::GetListeners,
@@ -64,9 +67,12 @@ impl ActionType {
             x if x == types[5] => ActionType::Response,
             x if x == types[6] => ActionType::Error,
             x if x == types[7] => ActionType::Emit,
-            _ => return None
+            _ => return Err(())
         })
     }
+}
+
+impl ActionType {
     pub fn default_types() -> [&'static str;8] {
         [
             "register_listener",

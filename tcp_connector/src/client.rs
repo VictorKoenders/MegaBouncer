@@ -46,6 +46,7 @@ impl TcpClient {
                 self.outgoing_buffer.drain(..length);
             },
             Err(e) => {
+                self.status = TcpClientStatus::Disconnected;
                 println!("Could not write to stream: {:?}", e);
             }
         };
@@ -60,21 +61,17 @@ impl TcpClient {
                     buffer_vec.extend(&buffer[0..length]);
                 },
                 Err(e) => {
-                    println!("Could not read: {:?}", e);
-                    let host = self.host.clone();
-                    if buffer_vec.len() > 0 {
+                    if !buffer_vec.is_empty() {
+                        let host = self.host.clone();
                         response.push(ComponentResponse::Send(Message::new_emit("tcp.data", |map| {
                             map.insert(String::from("host"), Value::String(host));
                             map.insert(String::from("port"), Value::Number(self.port.into()));
                             map.insert(String::from("data"), Value::String(::base64::encode(&buffer_vec)));
                         })));
                     } else {
+                        println!("Could not read any data: {:?}", e);
                         self.status = TcpClientStatus::Disconnected;
-                        response.push(ComponentResponse::Send(Message::new_emit("tcp.status", |map| {
-                            map.insert(String::from("host"), Value::String(host));
-                            map.insert(String::from("port"), Value::Number(self.port.into()));
-                            map.insert(String::from("status"), Value::String(self.status.to_string()));
-                        })));
+                        response.push(self.get_status_message());
                     }
                     return;
                 }
@@ -82,11 +79,22 @@ impl TcpClient {
         }
     }
 
+    fn get_status_message(&self) -> ComponentResponse {
+        ComponentResponse::Send(Message::new_emit("tcp.status", |map| {
+            map.insert(String::from("host"), Value::String(self.host.clone()));
+            map.insert(String::from("port"), Value::Number(self.port.into()));
+            map.insert(String::from("status"), Value::String(self.status.to_string()));
+        }))
+    }
+
     pub fn handle(&mut self, event: &Event) -> Vec<ComponentResponse> {
         let readiness = event.readiness();
         let mut response = Vec::new();
         if readiness.is_writable() {
-            self.try_write(true)
+            self.try_write(true);
+            if self.status == TcpClientStatus::Disconnected {
+                response.push(self.get_status_message());
+            }
         }
         if readiness.is_readable() {
             self.try_read(&mut response);
@@ -95,6 +103,7 @@ impl TcpClient {
     }
 }
 
+#[derive(PartialEq)]
 pub enum TcpClientStatus {
     Connected,
     Disconnected

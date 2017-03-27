@@ -69,13 +69,13 @@ impl Message {
 
 impl ToString for Message {
     fn to_string(&self) -> String {
-        match self {
-            &Message::Ping(ref str) => format!("PING {}", str),
-            &Message::Pong(ref str) => format!("PONG {}", str),
-            &Message::Notice(_, ref target, ref message) => format!("NOTICE {} :{}", target.to_string(), message),
-            &Message::Privmsg(_, ref target, ref message) => format!("PRIVMSG {} :{}", target.to_string(), message),
-            &Message::Mode(_, ref target, ref modes) => format!("MODE {} +{}", target.to_string(), modes.iter().collect::<String>()),
-            &Message::Numeric(_, ref _number, ref _message) => unreachable!()
+        match *self {
+            Message::Ping(ref str) => format!("PING {}", str),
+            Message::Pong(ref str) => format!("PONG {}", str),
+            Message::Notice(_, ref target, ref message) => format!("NOTICE {} :{}", target.to_string(), message),
+            Message::Privmsg(_, ref target, ref message) => format!("PRIVMSG {} :{}", target.to_string(), message),
+            Message::Mode(_, ref target, ref modes) => format!("MODE {} +{}", target.to_string(), modes.iter().collect::<String>()),
+            Message::Numeric(_, ref _number, ref _message) => unreachable!()
         }
     }
 }

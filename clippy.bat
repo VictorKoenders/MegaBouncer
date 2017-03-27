@@ -1,0 +1,10 @@
+set PATH=%PATH%;C:\Users\vkoenders.INTRANET\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\bin\
+cd server
+cargo clippy
+cd ../tcp_connector
+cargo clippy
+cd ../irc_connector
+cargo clippy
+cd ../test_client
+cargo clippy
+cd ../

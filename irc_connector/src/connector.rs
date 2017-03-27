@@ -113,7 +113,7 @@ impl Component for IrcConnector {
         }
         response
     }
-    fn node_connected(&mut self, _poll: &Poll, name: &String) -> Vec<ComponentResponse>{
+    fn node_connected(&mut self, _poll: &Poll, name: &str) -> Vec<ComponentResponse>{
         if name == "TCP Connector" {
             self.get_join_messages()
         } else {

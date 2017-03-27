@@ -3,6 +3,7 @@ use std::error::Error as StdError;
 use super::error::{Error, Result};
 use super::{ActionType, Channel};
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct Message {
@@ -79,7 +80,7 @@ impl Message {
             .ok_or_else(||Error::new_invalid_json("Action field needs to be a string"))?;
         
         let action = ActionType::from_str(action)
-            .ok_or_else(|| Error::new_invalid_json(format!("Invalid action field, needs to be one of: {}", ActionType::default_types().join(", "))))?;
+            .map_err(|_| Error::new_invalid_json(format!("Invalid action field, needs to be one of: {}", ActionType::default_types().join(", "))))?;
 
         let channel = value
             .get("channel")

@@ -7,9 +7,9 @@ pub enum Target {
 
 impl ToString for Target {
     fn to_string(&self) -> String {
-        match self {
-            &Target::Channel(ref channel) => format!("#{}", channel),
-            &Target::Person(ref person) => person.clone()
+        match *self {
+            Target::Channel(ref channel) => format!("#{}", channel),
+            Target::Person(ref person) => person.clone()
         }
     }
 }

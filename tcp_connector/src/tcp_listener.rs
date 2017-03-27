@@ -67,7 +67,7 @@ impl TcpListener {
         poll.register(&stream, token, Ready::readable() | Ready::writable(), PollOpt::edge()).unwrap();
         self.connections.push(TcpClient::new(host.clone(), port as u16, stream, addr, token));
         let last = self.connections.last();
-        let ref connection = last.as_ref().unwrap();
+        let connection = &last.as_ref().unwrap();
 
         let mut result = Vec::new();
         result.push(ComponentResponse::RegisterToken(connection.token));

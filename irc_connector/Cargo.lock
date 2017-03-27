@@ -2,13 +2,13 @@
 name = "irc_connector"
 version = "0.1.0"
 dependencies = [
- "base64 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "base64 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "shared 0.1.0",
 ]
 
 [[package]]
 name = "base64"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -160,7 +160,7 @@ dependencies = [
 ]
 
 [metadata]
-"checksum base64 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "065a0ce220ab84d0b6d5ae3e7bb77232209519c366f51f946fe28c19e84989d0"
+"checksum base64 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9892882c3bd89ed02dec391c128984c772b663a29700c32b5de0b33861cdf2bd"
 "checksum byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c40977b0ee6b9885c9013cd41d9feffdd22deb3bb4dc3a71d901cc7a77de18c8"
 "checksum cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "de1e760d7b6535af4241fca8bd8adf68e2e7edacc6b29f5d399050c5e48cf88c"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
