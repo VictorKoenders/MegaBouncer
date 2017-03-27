@@ -1,9 +1,17 @@
 cd server
+cargo clean
 cargo check
+cargo test
 cd ../tcp_connector
+cargo clean
 cargo check
+cargo test
 cd ../irc_connector
+cargo clean
 cargo check
+cargo test
 cd ../test_client
+cargo clean
 cargo check
+cargo test
 cd ../
