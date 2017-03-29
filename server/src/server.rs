@@ -111,12 +111,6 @@ impl Server {
         }
     }
 
-    // fn emit(&mut self, message: Message) {
-    //     for ref mut client in self.clients.values_mut() {
-    //         client.try_send(message.clone());
-    //     }
-    // }
-
     fn handle_client_events(&mut self, token: &Token, events: Vec<ClientEvent>) {
         for event in events {
             match event {
