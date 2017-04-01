@@ -24,9 +24,14 @@ macro_rules! get_or_return {
 impl IrcServer {
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
         match message {
-            Message::Ping(msg) => response.push(self.send_raw(Message::Pong(msg))),
-            x => println!("{:?}", x)
+            Message::Ping(ref msg) => response.push(self.send_raw(Message::Pong(msg.clone()))),
+            _ => println!("{:?}", message)
         };
+        response.push(ComponentResponse::Send(::shared::Message::new_emit("irc.message", |map| {
+            map.insert(String::from("host"), Value::String(self.host.clone()));
+            map.insert(String::from("port"), Value::Number(self.port.into()));
+            map.insert(String::from("message"), message.as_json());
+        })));
     }
     pub fn handle_data(&mut self, data: String, response: &mut Vec<ComponentResponse>) {
         self.buffer += &data;

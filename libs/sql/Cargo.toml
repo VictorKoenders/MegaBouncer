@@ -1,0 +1,7 @@
+[package]
+name = "sql"
+version = "0.1.0"
+authors = ["Victor Koenders <victor.koenders@gmail.com>"]
+
+[dependencies]
+sql_derive = { path = "../sql_derive" }

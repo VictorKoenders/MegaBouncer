@@ -223,9 +223,12 @@ impl Client {
             while let Some(index) = self.buffer.iter().position(|c| *c == b'\n') {
                 let line = self.buffer.drain(0..index + 1).collect();
                 if let Ok(line) = String::from_utf8(line) {
-                    match self.handle_line(line) {
+                    match self.handle_line(line.clone()) {
                         Ok(e) => events.extend(e.into_iter()),
-                        Err(e) => self.write(Message::from_error(e)),
+                        Err(e) => {
+                            println!("Could not parse line {:?}: {:?}", line, e);
+                            self.write(Message::from_error(e));
+                        }
                     };
                 }
             }

@@ -1,5 +1,7 @@
 mod sender;
 mod target;
+
+use shared::prelude::{Map, Value};
 pub use self::sender::Sender;
 pub use self::target::Target;
 
@@ -64,6 +66,51 @@ impl Message {
             println!("Unknown line type {:?}", line_type);
             None
         }
+    }
+
+    pub fn as_json(&self) -> Value {
+        Value::Object({
+            let mut map = Map::new();
+            match *self {
+                Message::Ping(ref str) => {
+                    map.insert(String::from("type"), Value::String(String::from("ping")));
+                    map.insert(String::from("ping"), Value::String(str.clone()));
+                },
+                Message::Pong(ref str) => {
+                    map.insert(String::from("type"), Value::String(String::from("pong")));
+                    map.insert(String::from("pong"), Value::String(str.clone()));
+                },
+                Message::Notice(ref sender, ref target, ref message) => {
+                    map.insert(String::from("type"), Value::String(String::from("notice")));
+                    map.insert(String::from("sender"), sender.to_json());
+                    map.insert(String::from("target"), target.to_json());
+                    map.insert(String::from("message"), Value::String(message.clone()));
+                },
+                Message::Privmsg(ref sender, ref target, ref message) => {
+                    map.insert(String::from("type"), Value::String(String::from("privmsg")));
+                    map.insert(String::from("sender"), sender.to_json());
+                    map.insert(String::from("target"), target.to_json());
+                    map.insert(String::from("message"), Value::String(message.clone()));
+                },
+                Message::Numeric(ref sender, number, ref message) => {
+                    map.insert(String::from("type"), Value::String(String::from("numeric")));
+                    map.insert(String::from("sender"), sender.to_json());
+                    map.insert(String::from("number"), Value::Number(number.into()));
+                    map.insert(String::from("message"), Value::String(message.clone()));
+                },
+                Message::Mode(ref sender, ref target, ref modes) => {
+                    map.insert(String::from("type"), Value::String(String::from("mode")));
+                    map.insert(String::from("sender"), sender.to_json());
+                    map.insert(String::from("target"), target.to_json());
+                    map.insert(String::from("modes"), Value::Array(modes
+                        .iter()
+                        .map(|m| Value::String(m.to_string()))
+                        .collect()
+                    ));
+                },
+            }
+            map
+        })
     }
 }
 

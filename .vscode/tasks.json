@@ -2,9 +2,11 @@
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
     "version": "0.1.0",
-    "command": "tsc",
+    "command": "webpack",
     "isShellCommand": true,
-    "args": ["-p", "./electron_client"],
+    "args": [],
     "showOutput": "silent",
-    "problemMatcher": "$tsc"
+    "options": {
+        "cwd": "${workspaceRoot}/electron_client/"
+    }
 }

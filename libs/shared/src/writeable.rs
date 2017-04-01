@@ -28,7 +28,9 @@ pub trait Writeable<T: TryInto<Vec<u8>> + Sized + 'static>
                         }
                     },
                     Err(e) => {
-                        panic!("Could not write to stream: {:?}", e);
+                        println!("Could not write to stream: {:?}", e);
+                        *write_queue.writeable = false;
+                        return;
                     }
                 }
             } else if let Some(message) = write_queue.message_queue.pop_front() {

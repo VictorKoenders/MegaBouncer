@@ -88,10 +88,10 @@ impl Message {
             .unwrap_or_else(||"")
             .to_owned();
 
-        let data = value
+        let data: Value = value
             .get("data")
-            .ok_or_else(||Error::new_invalid_json("Root JSON object needs a data field"))?
-            .clone();
+            .map(|d| d.clone())
+            .unwrap_or_else(||Value::Null);
 
         Ok(Message {
             action: action,

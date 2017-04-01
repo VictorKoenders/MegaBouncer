@@ -1,3 +1,4 @@
+use shared::prelude::Value;
 
 #[derive(Debug)]
 pub enum Target {
@@ -20,6 +21,13 @@ impl Target {
             Target::Channel(String::from(&string[1..]))
         } else {
             Target::Person(String::from(string))
+        }
+    }
+
+    pub fn to_json(&self) -> Value {
+        match *self {
+            Target::Channel(ref str) => Value::String(format!("#{}", str)),
+            Target::Person(ref str) => Value::String(str.clone())
         }
     }
 }

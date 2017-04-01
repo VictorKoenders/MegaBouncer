@@ -1,3 +1,5 @@
+use shared::prelude::{Map, Value};
+
 #[derive(Debug)]
 pub struct Sender {
     pub name: String,
@@ -20,5 +22,13 @@ impl Sender {
                 flags: Vec::new()
             }
         }
+    }
+    pub fn to_json(&self) -> Value {
+        Value::Object({
+            let mut map = Map::new();
+            map.insert(String::from("name"), Value::String(self.name.clone()));
+            map.insert(String::from("host"), Value::String(self.host.clone()));
+            map
+        })
     }
 }
