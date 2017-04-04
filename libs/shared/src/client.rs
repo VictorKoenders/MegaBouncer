@@ -1,10 +1,11 @@
-use super::{ActionType, Channel, Component, ComponentResponse, ComponentWrapper, Message};
+use super::{ActionType, Channel, Component, ComponentResponse, ComponentWrapper, Message, MessageReply};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use super::writeable::{Writeable, WriteQueue};
 use serde_json::{from_str, Value};
 use std::collections::VecDeque;
 use mio::tcp::TcpStream;
 use std::io::Read;
+use uuid::Uuid;
 
 pub struct Client {
     components: Vec<ComponentWrapper>,
@@ -17,6 +18,7 @@ pub struct Client {
     writeable: bool,
     running: bool,
     name: Option<String>,
+    current_message: Option<(Channel, Uuid)>,
 }
 
 impl Default for Client {
@@ -32,6 +34,7 @@ impl Default for Client {
             writeable: false,
             running: true,
             name: None,
+            current_message: None,
         }
     }
 }
@@ -72,9 +75,14 @@ impl Client {
                         ComponentResponse::RemoveToken(token) => {
                             component.tokens.retain(|t| *t != token);
                         },
-                        ComponentResponse::Reply(_value) => unimplemented!(),
-                        ComponentResponse::Send(message) => {
-                            messages_to_send.push_back(message)
+                        ComponentResponse::Reply(value) => {
+                            if let Some((channel, uuid)) = self.current_message.clone() {
+                                messages_to_send.push_back(Message::new_reply(&channel, uuid, value));
+                            }
+                        },
+                        ComponentResponse::Send(mut message) => {
+                            message.id = MessageReply::ID(Uuid::new_v4());
+                            messages_to_send.push_back(message);
                         },
                         ComponentResponse::RemoveSelf => unimplemented!(),
                     }

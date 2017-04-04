@@ -6,5 +6,7 @@ export abstract class ContainerComponent {
 
     abstract render_title(): JSX.Element;
     abstract render(): JSX.Element;
-    toggle_active(newstate: boolean) {}
+    toggle_active(newstate: boolean) {
+        this.active = newstate;
+    }
 }

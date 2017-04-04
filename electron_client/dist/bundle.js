@@ -82,7 +82,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var ContainerComponent = (function () {
     function ContainerComponent() {
     }
-    ContainerComponent.prototype.toggle_active = function (newstate) { };
+    ContainerComponent.prototype.toggle_active = function (newstate) {
+        this.active = newstate;
+    };
     return ContainerComponent;
 }());
 exports.ContainerComponent = ContainerComponent;
@@ -145,8 +147,9 @@ var Container = (function (_super) {
         }
     };
     Container.prototype.component_clicked = function (component, index, event) {
+        this.state.components[this.state.active_index].toggle_active(false);
+        this.state.components[index].toggle_active(true);
         this.setState(function (current) { return (__assign({}, current, { active_index: index })); });
-        console.log('selecting', component);
     };
     Container.prototype.renderComponent = function (component, index) {
         var className = index == this.state.active_index ? "active" : "";
@@ -231,6 +234,13 @@ var Chat = (function (_super) {
         _this.connector.on('irc.message', _this.irc_message_received.bind(_this));
         return _this;
     }
+    Chat.prototype.toggle_active = function (newstate) {
+        if (newstate) {
+            this.state.count = 0;
+            this.state_changed();
+        }
+        _super.prototype.toggle_active.call(this, newstate);
+    };
     Chat.prototype.render_title = function () {
         return React.createElement("span", null,
             "Chat",
@@ -241,6 +251,7 @@ var Chat = (function (_super) {
     };
     Chat.prototype.irc_message_received = function (data) {
         if (data.message.type == "privmsg") {
+            console.log(JSON.stringify(data));
             var message = {
                 sender: data.message.sender.name,
                 message: data.message.message
@@ -317,9 +328,6 @@ var Dashboard = (function (_super) {
     function Dashboard() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    Dashboard.prototype.toggle_active = function (newstate) {
-        throw new Error('Method not implemented.');
-    };
     Dashboard.prototype.render_title = function () {
         return React.createElement("span", null, "Dashboard");
     };

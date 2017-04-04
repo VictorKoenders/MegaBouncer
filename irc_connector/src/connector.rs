@@ -72,6 +72,44 @@ impl IrcConnector {
             _ => None
         }
     }
+    
+    fn send_message(&mut self, message: &Value, response: &mut Vec<ComponentResponse>) {
+        let server: &mut IrcServer = match self.get_server(message) {
+            Some(server) => server,
+            None => {
+                println!("Could not find message server: {:?}", message);
+                return;
+            }
+        };
+        
+        let message_type: &String = match message.as_object().map(|o| o.get("type")) {
+            Some(Some(&Value::String(ref t))) => t,
+            _ => {
+                println!("Could not find message type: {:?}", message);
+                return;
+            }
+        };
+        match message_type.as_str() {
+            "privmsg" => {
+                let target: &String = match message.as_object().map(|o| o.get("target")) {
+                    Some(Some(&Value::String(ref t))) => t,
+                    _ => {
+                        println!("Could not find privmsg target: {:?}", message);
+                        return;
+                    }
+                };
+                let message: &String = match message.as_object().map(|o| o.get("message")) {
+                    Some(Some(&Value::String(ref t))) => t,
+                    _ => {
+                        println!("Could not find privmsg message: {:?}", message);
+                        return;
+                    }
+                };
+                response.push(server.send_raw(format!("PRIVMSG {} :{}", target, message)));
+            },
+            _ => println!("Unknown type {:?}: {:?}", message_type, message)
+        };
+    }
 }
 
 impl Component for IrcConnector {
@@ -108,6 +146,8 @@ impl Component for IrcConnector {
                     println!("Could not find message data: {:?}", message);
                 }
             };
+        } else if channel == "irc.send" {
+            self.send_message(message, &mut response);
         } else {
             println!("Received {:?}: {:?}", channel, message);
         }

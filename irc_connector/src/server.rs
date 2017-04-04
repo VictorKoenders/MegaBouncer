@@ -12,15 +12,6 @@ pub struct IrcServer {
     pub buffer: String,
 }
 
-macro_rules! get_or_return {
-    ($e:expr) => {
-        match $e {
-            Some(val) => val,
-            None => return
-        }
-    }
-}
-
 impl IrcServer {
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
         match message {
@@ -33,6 +24,7 @@ impl IrcServer {
             map.insert(String::from("message"), message.as_json());
         })));
     }
+
     pub fn handle_data(&mut self, data: String, response: &mut Vec<ComponentResponse>) {
         self.buffer += &data;
         while let Some(index) = self.buffer.bytes().position(|b| b == b'\n') {
@@ -45,7 +37,7 @@ impl IrcServer {
         }
     }
 
-    fn send_raw(&self, msg: Message) -> ComponentResponse {
+    pub fn send_raw<T: ToString>(&self, msg: T) -> ComponentResponse {
         let str = msg.to_string() + "\r\n";
         println!("<- {:?}", str.to_string());
         ComponentResponse::Send(::shared::Message::new_emit("tcp.send", |map| {

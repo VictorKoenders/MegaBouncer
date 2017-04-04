@@ -1,12 +1,14 @@
+use super::{ActionType, Channel, MessageReply};
 use serde_json::{Map, Value, to_vec};
 use std::error::Error as StdError;
 use super::error::{Error, Result};
-use super::{ActionType, Channel};
 use std::convert::TryFrom;
 use std::str::FromStr;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Message {
+    pub id: MessageReply,
     pub action: ActionType,
     pub channel: Option<Channel>,
     pub data: Value,
@@ -17,6 +19,7 @@ impl TryFrom<Message> for Vec<u8> {
 
     fn try_from(message: Message) -> Result<Vec<u8>> {
         let mut obj = Map::new();
+        message.id.inject_into(&mut obj);
         obj.insert(String::from("action"), Value::String(message.action.to_string()));
         if let Some(ref channel) = message.channel {
             obj.insert("channel".to_owned(), Value::String(channel.to_string()));
@@ -28,21 +31,11 @@ impl TryFrom<Message> for Vec<u8> {
 }
 
 impl Message {
-    // pub fn to_bytes(&self) -> Result<Vec<u8>> {
-    //     let mut obj = Map::new();
-    //     obj.insert(String::from("action"), Value::String(self.action.to_string()));
-    //     if let Some(ref channel) = self.channel {
-    //         obj.insert("channel".to_owned(), Value::String(channel.to_string()));
-    //     }
-    //     obj.insert("data".to_owned(), self.data.clone());
-    //     let json = Value::Object(obj);
-    //     to_vec(&json).map_err(From::from)
-    // }
-
     pub fn from_error<E: StdError>(error: E) -> Message {
         let mut obj = Map::new();
         obj.insert("message".to_owned(), Value::String(error.description().to_string()));
         Message {
+            id: MessageReply::None,
             action: ActionType::Error,
             channel: None,
             data: Value::Object(obj),
@@ -54,6 +47,7 @@ impl Message {
         obj.insert("message".to_owned(), Value::String(error.description().to_string()));
         obj.insert("description".to_owned(), Value::String(str.to_string()));
         Message {
+            id: MessageReply::None,
             action: ActionType::Error,
             channel: None,
             data: Value::Object(obj),
@@ -63,6 +57,7 @@ impl Message {
         let mut obj = Map::new();
         obj.insert("message".to_owned(), Value::String(error.to_string()));
         Message {
+            id: MessageReply::None,
             action: ActionType::Error,
             channel: None,
             data: Value::Object(obj),
@@ -70,6 +65,7 @@ impl Message {
     }
 
     pub fn from_json(value: Value) -> Result<Message> {
+        let v = &value;
         let value = value.as_object()
             .ok_or_else(||Error::new_invalid_json("JSON value should be an object"))?;
 
@@ -94,6 +90,7 @@ impl Message {
             .unwrap_or_else(||Value::Null);
 
         Ok(Message {
+            id: MessageReply::from_value(v),
             action: action,
             channel: Some(Channel::from_string(channel)),
             data: data
@@ -102,6 +99,7 @@ impl Message {
     
     pub fn new_identify<T: ToString>(name: &T) -> Message {
         Message {
+            id: MessageReply::None,
             action: ActionType::Identify,
             channel: None,
             data: Value::Object({
@@ -114,14 +112,25 @@ impl Message {
     
     pub fn new_register_listener<T: ToString>(channel: &T) -> Message {
         Message {
+            id: MessageReply::None,
             action: ActionType::RegisterListener,
             channel: Some(Channel::from_string(channel.to_string())),
             data: Value::Null,
         }
     }
+
+    pub fn new_reply<T: ToString>(channel: &T, uuid: Uuid, value: Value) -> Message {
+        Message {
+            id: MessageReply::Reply(uuid),
+            action: ActionType::Response,
+            channel: Some(Channel::from_string(channel.to_string())),
+            data: value
+        }
+    }
     
     pub fn new_forget_listener<T: ToString>(channel: &T) -> Message {
         Message {
+            id: MessageReply::None,
             action: ActionType::ForgetListener,
             channel: Some(Channel::from_string(channel.to_string())),
             data: Value::Null,
@@ -130,6 +139,7 @@ impl Message {
 
     pub fn new_emit<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T, callback: C) -> Message {
         Message {
+            id: MessageReply::None,
             action: ActionType::Emit,
             channel: Some(Channel::from_string(channel)),
             data: Value::Object({

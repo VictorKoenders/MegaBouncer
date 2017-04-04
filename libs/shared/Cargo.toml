@@ -6,3 +6,4 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 [dependencies]
 serde_json = "*"
 mio = "*"
+uuid = { version = "*", features = ["v4"] }

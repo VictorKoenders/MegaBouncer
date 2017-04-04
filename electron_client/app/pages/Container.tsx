@@ -33,13 +33,16 @@ export class Container extends React.Component<{}, ContainerState> {
             this.forceUpdate();
         }
     }
+    
     component_clicked(component: ContainerComponent, index: number, event: Event){
+        this.state.components[this.state.active_index].toggle_active(false);
+        this.state.components[index].toggle_active(true);
         this.setState((current) => ({
             ...current,
             active_index: index
         }));
-        console.log('selecting', component);
     }
+
     renderComponent(component: ContainerComponent, index: number) {
         const className = index == this.state.active_index ? "active" : "";
         return <li key={index} className={className} onClick={this.component_clicked.bind(this, component, index)}>
@@ -48,6 +51,7 @@ export class Container extends React.Component<{}, ContainerState> {
             }</a>
         </li>;
     }
+
     render() {
         return <div className="container-fluid">
             <ul className="nav nav-tabs">

@@ -18,6 +18,8 @@ declare var remote: {
 
 export class Chat extends ContainerComponent {
     connector: any;
+    state: ChatState;
+
     constructor() {
         super();
         this.state = {
@@ -27,6 +29,14 @@ export class Chat extends ContainerComponent {
         };
         this.connector = remote.getGlobal('connector');
         this.connector.on('irc.message', this.irc_message_received.bind(this));
+    }
+
+    toggle_active(newstate: boolean) {
+        if(newstate){
+            this.state.count = 0;
+            this.state_changed();
+        }
+        super.toggle_active(newstate);
     }
 
     render_title(): JSX.Element {
@@ -40,10 +50,10 @@ export class Chat extends ContainerComponent {
             : ""}
         </span>;
     }
-    state: ChatState;
 
     irc_message_received(data: any){
         if(data.message.type == "privmsg") {
+            console.log(JSON.stringify(data));
             var message = {
                 sender: data.message.sender.name,
                 message: data.message.message
