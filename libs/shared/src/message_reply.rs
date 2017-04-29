@@ -36,4 +36,11 @@ impl MessageReply {
         }
         MessageReply::None
     }
+
+    pub fn is_reply(&self) -> bool {
+        match self {
+            &MessageReply::Reply(_) => true,
+            _ => false
+        }
+    }
 }

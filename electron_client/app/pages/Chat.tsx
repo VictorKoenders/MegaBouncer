@@ -12,12 +12,7 @@ class ChatMessage {
     message: string;
 }
 
-declare var remote: {
-    getGlobal: (name: string) => any,
-};
-
 export class Chat extends ContainerComponent {
-    connector: any;
     state: ChatState;
 
     constructor() {
@@ -27,8 +22,7 @@ export class Chat extends ContainerComponent {
             scrollback: [],
             input_text: ''
         };
-        this.connector = remote.getGlobal('connector');
-        this.connector.on('irc.message', this.irc_message_received.bind(this));
+        this.register_listener('irc.message', this.irc_message_received.bind(this));
     }
 
     toggle_active(newstate: boolean) {
@@ -53,7 +47,6 @@ export class Chat extends ContainerComponent {
 
     irc_message_received(data: any){
         if(data.message.type == "privmsg") {
-            console.log(JSON.stringify(data));
             var message = {
                 sender: data.message.sender.name,
                 message: data.message.message
@@ -75,7 +68,7 @@ export class Chat extends ContainerComponent {
 
     send_text(e: Event) {
         e.preventDefault();
-        this.connector.send_emit('irc.send', {
+        this.emit('irc.send', {
             host: 'irc.esper.net',
             port: 6667,
             type: 'privmsg',

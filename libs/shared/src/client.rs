@@ -1,11 +1,10 @@
-use super::{ActionType, Channel, Component, ComponentResponse, ComponentWrapper, Message, MessageReply};
+use super::{ActionType, Channel, Component, ComponentResponse, ComponentWrapper, Message, MessageReply, Uuid};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use super::writeable::{Writeable, WriteQueue};
 use serde_json::{from_str, Value};
 use std::collections::VecDeque;
 use mio::tcp::TcpStream;
 use std::io::Read;
-use uuid::Uuid;
 
 pub struct Client {
     components: Vec<ComponentWrapper>,
@@ -17,7 +16,7 @@ pub struct Client {
     incoming_buffer: String,
     writeable: bool,
     running: bool,
-    name: Option<String>,
+    pub name: Option<String>,
     current_message: Option<(Channel, Uuid)>,
 }
 
@@ -112,6 +111,12 @@ impl Client {
 
     fn handle_message(&mut self, message: Message){
         match message.action {
+            ActionType::Emit if message.id.is_reply() => {
+                let uuid = if let MessageReply::Reply(uuid) = message.id { uuid } else { unreachable!() };
+                self.execute(|component, poll| 
+                    component.component.reply_received(poll, uuid, &message.channel, &message.data)
+                );
+            },
             ActionType::Emit if message.channel.is_some() => {
                 let inner_message = message.clone();
                 if let Some(channel) = message.channel {

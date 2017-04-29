@@ -6,9 +6,9 @@
 /******/ 	function __webpack_require__(moduleId) {
 /******/
 /******/ 		// Check if module is in cache
-/******/ 		if(installedModules[moduleId])
+/******/ 		if(installedModules[moduleId]) {
 /******/ 			return installedModules[moduleId].exports;
-/******/
+/******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = installedModules[moduleId] = {
 /******/ 			i: moduleId,
@@ -79,14 +79,35 @@ module.exports = React;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var ContainerComponent = (function () {
-    function ContainerComponent() {
+class Listener {
+}
+;
+class ContainerComponent {
+    constructor() {
+        this._connector = remote.getGlobal('connector');
+        this._listeners = [];
     }
-    ContainerComponent.prototype.toggle_active = function (newstate) {
+    emit(channel, value = {}) {
+        this._connector.send_emit(channel, value);
+    }
+    register_listener(channel, callback) {
+        this._listeners.push({ channel, callback });
+        this._connector.on(channel, callback.bind(this));
+    }
+    remove_listener(channel) {
+        this._connector.removeAllListeners(channel);
+        this._listeners = this._listeners.filter(l => l.channel != channel);
+    }
+    remove_all_listeners() {
+        this._listeners.forEach(l => {
+            this._connector.removeAllListeners(l.channel);
+        });
+        this._listeners = [];
+    }
+    toggle_active(newstate) {
         this.active = newstate;
-    };
-    return ContainerComponent;
-}());
+    }
+}
 exports.ContainerComponent = ContainerComponent;
 
 
@@ -96,73 +117,51 @@ exports.ContainerComponent = ContainerComponent;
 
 "use strict";
 
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var __assign = (this && this.__assign) || Object.assign || function(t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-        s = arguments[i];
-        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-            t[p] = s[p];
-    }
-    return t;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-var React = __webpack_require__(0);
-var Dashboard_1 = __webpack_require__(6);
-var Chat_1 = __webpack_require__(5);
-var ContainerState = (function () {
-    function ContainerState() {
-    }
-    return ContainerState;
-}());
-var Container = (function (_super) {
-    __extends(Container, _super);
-    function Container() {
-        var _this = _super.call(this) || this;
-        _this.state = {
-            components: Array(new Dashboard_1.Dashboard(), new Chat_1.Chat()),
+const React = __webpack_require__(0);
+const Dashboard_1 = __webpack_require__(6);
+const Chat_1 = __webpack_require__(5);
+const Nodes_1 = __webpack_require__(7);
+class ContainerState {
+}
+class Container extends React.Component {
+    constructor() {
+        super();
+        this.state = {
+            components: Array(new Dashboard_1.Dashboard(), new Nodes_1.Nodes(), new Chat_1.Chat()),
             active_index: 0
         };
-        _this.state.components.forEach(function (component) {
-            component.title_changed = _this.component_title_changed.bind(_this, component);
-            component.state_changed = _this.component_state_changed.bind(_this, component);
+        this.state.components.forEach(component => {
+            component.title_changed = this.component_title_changed.bind(this, component);
+            component.state_changed = this.component_state_changed.bind(this, component);
         });
-        return _this;
+        window.container = this;
     }
-    Container.prototype.component_title_changed = function (component) {
+    component_title_changed(component) {
         this.forceUpdate();
-    };
-    Container.prototype.component_state_changed = function (component) {
-        var index = this.state.components.indexOf(component);
+    }
+    component_state_changed(component) {
+        let index = this.state.components.indexOf(component);
         if (index == this.state.active_index) {
             this.forceUpdate();
         }
-    };
-    Container.prototype.component_clicked = function (component, index, event) {
+    }
+    component_clicked(component, index, event) {
         this.state.components[this.state.active_index].toggle_active(false);
         this.state.components[index].toggle_active(true);
-        this.setState(function (current) { return (__assign({}, current, { active_index: index })); });
-    };
-    Container.prototype.renderComponent = function (component, index) {
-        var className = index == this.state.active_index ? "active" : "";
+        this.setState((current) => (Object.assign({}, current, { active_index: index })));
+    }
+    renderComponent(component, index) {
+        const className = index == this.state.active_index ? "active" : "";
         return React.createElement("li", { key: index, className: className, onClick: this.component_clicked.bind(this, component, index) },
             React.createElement("a", { href: "#" }, component.render_title()));
-    };
-    Container.prototype.render = function () {
+    }
+    render() {
         return React.createElement("div", { className: "container-fluid" },
             React.createElement("ul", { className: "nav nav-tabs" }, this.state.components.map(this.renderComponent.bind(this))),
             this.state.components[this.state.active_index].render());
-    };
-    return Container;
-}(React.Component));
+    }
+}
 exports.Container = Container;
 
 
@@ -179,10 +178,10 @@ module.exports = ReactDOM;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var React = __webpack_require__(0);
-var ReactDOM = __webpack_require__(3);
-var Container_1 = __webpack_require__(2);
-var element = document.createElement("div");
+const React = __webpack_require__(0);
+const ReactDOM = __webpack_require__(3);
+const Container_1 = __webpack_require__(2);
+const element = document.createElement("div");
 ReactDOM.render(React.createElement(Container_1.Container, null), element);
 document.body.appendChild(element);
 window.onkeydown = function (ev) {
@@ -198,60 +197,40 @@ window.onkeydown = function (ev) {
 
 "use strict";
 
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-var React = __webpack_require__(0);
-var ContainerComponent_1 = __webpack_require__(1);
-var ChatState = (function () {
-    function ChatState() {
-    }
-    return ChatState;
-}());
-var ChatMessage = (function () {
-    function ChatMessage() {
-    }
-    return ChatMessage;
-}());
-var Chat = (function (_super) {
-    __extends(Chat, _super);
-    function Chat() {
-        var _this = _super.call(this) || this;
-        _this.state = {
+const React = __webpack_require__(0);
+const ContainerComponent_1 = __webpack_require__(1);
+class ChatState {
+}
+class ChatMessage {
+}
+class Chat extends ContainerComponent_1.ContainerComponent {
+    constructor() {
+        super();
+        this.state = {
             count: 0,
             scrollback: [],
             input_text: ''
         };
-        _this.connector = remote.getGlobal('connector');
-        _this.connector.on('irc.message', _this.irc_message_received.bind(_this));
-        return _this;
+        this.register_listener('irc.message', this.irc_message_received.bind(this));
     }
-    Chat.prototype.toggle_active = function (newstate) {
+    toggle_active(newstate) {
         if (newstate) {
             this.state.count = 0;
             this.state_changed();
         }
-        _super.prototype.toggle_active.call(this, newstate);
-    };
-    Chat.prototype.render_title = function () {
+        super.toggle_active(newstate);
+    }
+    render_title() {
         return React.createElement("span", null,
             "Chat",
             this.state.count ? " " : "",
             this.state.count ?
                 React.createElement("span", { className: "badge" }, this.state.count)
                 : "");
-    };
-    Chat.prototype.irc_message_received = function (data) {
+    }
+    irc_message_received(data) {
         if (data.message.type == "privmsg") {
-            console.log(JSON.stringify(data));
             var message = {
                 sender: data.message.sender.name,
                 message: data.message.message
@@ -265,14 +244,14 @@ var Chat = (function (_super) {
             }
             this.state_changed();
         }
-    };
-    Chat.prototype.tick = function () {
+    }
+    tick() {
         this.state.count += 1;
         this.title_changed();
-    };
-    Chat.prototype.send_text = function (e) {
+    }
+    send_text(e) {
         e.preventDefault();
-        this.connector.send_emit('irc.send', {
+        this.emit('irc.send', {
             host: 'irc.esper.net',
             port: 6667,
             type: 'privmsg',
@@ -281,26 +260,23 @@ var Chat = (function (_super) {
         });
         this.state.input_text = '';
         this.state_changed();
-    };
-    Chat.prototype.update_text = function (e) {
+    }
+    update_text(e) {
         this.state.input_text = e.target.value;
         this.state_changed();
-    };
-    Chat.prototype.render = function () {
+    }
+    render() {
         return React.createElement("div", null,
-            this.state.scrollback.map(function (msg, index) {
-                return React.createElement("div", { key: index },
-                    React.createElement("b", null,
-                        msg.sender,
-                        ": "),
-                    msg.message);
-            }),
+            this.state.scrollback.map((msg, index) => React.createElement("div", { key: index },
+                React.createElement("b", null,
+                    msg.sender,
+                    ": "),
+                msg.message)),
             React.createElement("div", { className: "float-bottom" },
                 React.createElement("form", { onSubmit: this.send_text.bind(this) },
                     React.createElement("input", { type: "text", value: this.state.input_text, onChange: this.update_text.bind(this) }))));
-    };
-    return Chat;
-}(ContainerComponent_1.ContainerComponent));
+    }
+}
 exports.Chat = Chat;
 
 
@@ -310,33 +286,110 @@ exports.Chat = Chat;
 
 "use strict";
 
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-var React = __webpack_require__(0);
-var ContainerComponent_1 = __webpack_require__(1);
-var Dashboard = (function (_super) {
-    __extends(Dashboard, _super);
-    function Dashboard() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    Dashboard.prototype.render_title = function () {
+const React = __webpack_require__(0);
+const ContainerComponent_1 = __webpack_require__(1);
+class Dashboard extends ContainerComponent_1.ContainerComponent {
+    render_title() {
         return React.createElement("span", null, "Dashboard");
-    };
-    Dashboard.prototype.render = function () {
+    }
+    render() {
         return React.createElement("div", null);
-    };
-    return Dashboard;
-}(ContainerComponent_1.ContainerComponent));
+    }
+}
 exports.Dashboard = Dashboard;
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const React = __webpack_require__(0);
+const ContainerComponent_1 = __webpack_require__(1);
+class Node {
+}
+class NodesState {
+}
+class Nodes extends ContainerComponent_1.ContainerComponent {
+    constructor() {
+        super();
+        this.state = {
+            nodes: []
+        };
+        this.register_listener("server.clients", this.clients_received);
+        this.register_listener("server.client.connected", this.client_connected);
+        this.register_listener("server.client.disconnected", this.client_disconnected);
+        this.register_listener("*", this.any_received);
+        this._connector.send_raw("get_clients", "", {});
+    }
+    client_connected(message) {
+        console.log('connected', JSON.stringify(message));
+    }
+    client_disconnected(message) {
+        var index = this.state.nodes.findIndex(n => n.name == message.name);
+        if (index != -1) {
+            this.state.nodes.splice(index, 1);
+            this.state_changed();
+            this.title_changed();
+        }
+    }
+    any_received(message) {
+        //console.log(JSON.stringify(message));
+        if (message.sender) {
+            var node = this.state.nodes.find(n => n.name == message.sender);
+            if (node == null) {
+                console.log('creating new node for ', message.sender);
+                node = { name: message.sender, sendQueue: [] };
+                this.state.nodes.push(node);
+                this.title_changed();
+            }
+            node.sendQueue.unshift(message);
+            while (node.sendQueue.length > 10) {
+                node.sendQueue.pop();
+            }
+            this.state_changed();
+        }
+    }
+    clients_received(clients) {
+        for (let name of clients.clients) {
+            let client = this.state.nodes.find(n => n.name == name);
+            if (client == null) {
+                this.state.nodes.push({
+                    name: name,
+                    sendQueue: []
+                });
+            }
+        }
+        for (let client of this.state.nodes.filter(c => clients.clients.every(cl => cl != c.name))) {
+            this.state.nodes.splice(this.state.nodes.indexOf(client), 1);
+        }
+        this.title_changed();
+        this.state_changed();
+    }
+    render_title() {
+        return React.createElement("span", null,
+            "Nodes (",
+            this.state.nodes.length,
+            ")");
+    }
+    render_node(node, index) {
+        return React.createElement("li", { key: index },
+            React.createElement("b", null,
+                node.name,
+                " (",
+                node.sendQueue.length,
+                ")"),
+            React.createElement("br", null),
+            React.createElement("ul", null, node.sendQueue.map((item, index) => React.createElement("li", { key: index }, JSON.stringify(item)))));
+    }
+    render() {
+        return React.createElement("ul", null, this.state.nodes.map(this.render_node.bind(this)));
+    }
+}
+exports.Nodes = Nodes;
 
 
 /***/ })

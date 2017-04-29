@@ -20,9 +20,11 @@ pub use component_wrapper::ComponentWrapper;
 pub use message_reply::MessageReply;
 pub use action_type::ActionType;
 pub use error::{Error, Result};
+pub use serde_json::Value;
 pub use message::Message;
 pub use channel::Channel;
 pub use client::Client;
+pub use uuid::Uuid;
 
 pub const ACTION_NAME: &'static str = "action";
 

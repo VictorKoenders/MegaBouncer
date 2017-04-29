@@ -1,24 +1,27 @@
 use shared::writeable::{Writeable, WriteQueue};
-use shared::{ActionType, Channel,  Message};
+use shared::{ActionType, Channel, Message, MessageReply};
 use std::collections::VecDeque;
 use serde_json::{self, Value};
-use shared::{Error, Result};
+use shared::{Error, Result, Uuid};
 use std::io::Read;
 use std::net::SocketAddr;
 use mio::tcp::TcpStream;
 use std::convert::From;
 
+const REPLY_MESSAGE_DEQUE_SIZE: usize = 5;
+
 pub struct Client {
     socket: TcpStream,
     pub address: SocketAddr,
-    name: Option<String>,
+    pub name: Option<String>,
     writeable: bool,
     readable: bool,
     buffer: Vec<u8>,
 
     channels: Vec<Channel>,
     write_buffer: VecDeque<Message>,
-    write_buffer_bytes: Vec<u8>
+    write_buffer_bytes: Vec<u8>,
+    reply_message_uuids: VecDeque<Uuid>,
 }
 
 impl Client {
@@ -33,6 +36,17 @@ impl Client {
             channels: Vec::new(),
             write_buffer: VecDeque::new(),
             write_buffer_bytes: Vec::new(),
+            reply_message_uuids: VecDeque::with_capacity(REPLY_MESSAGE_DEQUE_SIZE),
+        }
+    }
+
+    pub fn try_accept_reply(&mut self, uuid: &Uuid, message: &Message) -> bool {
+        if let Some(index) = self.reply_message_uuids.iter().position(|u| u == uuid) {
+            self.try_send(message.clone());
+            self.reply_message_uuids.remove(index);
+            true
+        } else {
+            false
         }
     }
 
@@ -64,7 +78,7 @@ impl Client {
         } else if let Value::Object(ref map) = message.data {
             if let Some(&Value::String(ref str)) = map.get("name") {
                 self.name = Some(str.clone());
-                result.push(ClientEvent::Broadcast(message.clone()));
+                result.push(ClientEvent::Broadcast(Message::new_connected_client(str.clone())));
             }
         }
         Ok(())
@@ -84,20 +98,21 @@ impl Client {
                              result: &mut Vec<ClientEvent>)
                              -> Result<()> {
         if !self.has_name() {
-            return Ok(())
+            return Ok(());
         }
         let channel = match message.channel {
             None => {
                 self.write_buffer.push_back(Message::from_error_string("Channel required with RegisterListener action"));
                 return Ok(());
-            },
-            Some(c) => Channel::from_string(c)
+            }
+            Some(c) => Channel::from_string(c),
         };
         let channel_string = channel.to_string();
         self.channels.push(channel);
         let message = Message::new_emit("client.listener.register", |map| {
             map.insert(String::from("channel"), Value::String(channel_string));
-            map.insert(String::from("client"), Value::String(self.name.clone().unwrap()));
+            map.insert(String::from("client"),
+                       Value::String(self.name.clone().unwrap()));
         });
         result.push(ClientEvent::Broadcast(message));
         Ok(())
@@ -108,37 +123,45 @@ impl Client {
                            result: &mut Vec<ClientEvent>)
                            -> Result<()> {
         if !self.has_name() {
-            return Ok(())
+            return Ok(());
         }
         let channel = match message.channel {
             None => {
                 self.write_buffer.push_back(Message::from_error_string("Channel required with ForgetListener action"));
                 return Ok(());
-            },
-            Some(c) => c
+            }
+            Some(c) => c,
         };
         while let Some(index) = self.channels.iter().position(|c| channel.matches(c)) {
             let old_channel = self.channels.remove(index);
             let message = Message::new_emit("client.listener.forget", |map| {
-                map.insert(String::from("channel"), Value::String(old_channel.to_string()));
-                map.insert(String::from("client"), Value::String(self.name.clone().unwrap()));
+                map.insert(String::from("channel"),
+                           Value::String(old_channel.to_string()));
+                map.insert(String::from("client"),
+                           Value::String(self.name.clone().unwrap()));
             });
             result.push(ClientEvent::Broadcast(message));
         }
         Ok(())
     }
 
-    fn try_get_listeners(&mut self, _message: Message, _result: &mut Vec<ClientEvent>) -> Result<()> {
+    fn try_get_listeners(&mut self,
+                         _message: Message,
+                         _result: &mut Vec<ClientEvent>)
+                         -> Result<()> {
         println!("Not implemented: try_get_listeners");
         Ok(())
     }
 
-    fn try_get_clients(&mut self, _message: Message, _result: &mut Vec<ClientEvent>) -> Result<()> {
-        println!("Not implemented: try_get_clients");
+    fn try_get_clients(&mut self, _message: Message, result: &mut Vec<ClientEvent>) -> Result<()> {
+        result.push(ClientEvent::SendClients);
         Ok(())
     }
 
-    fn try_get_response(&mut self, _message: Message, _result: &mut Vec<ClientEvent>) -> Result<()> {
+    fn try_get_response(&mut self,
+                        _message: Message,
+                        _result: &mut Vec<ClientEvent>)
+                        -> Result<()> {
         println!("Not implemented: try_get_response");
         Ok(())
     }
@@ -149,7 +172,12 @@ impl Client {
     }
 
     fn try_emit(&mut self, message: Message, result: &mut Vec<ClientEvent>) -> Result<()> {
-        // TODO: implement a reply token
+        if let MessageReply::ID(uuid) = message.id {
+            self.reply_message_uuids.push_back(uuid);
+            if self.reply_message_uuids.len() > REPLY_MESSAGE_DEQUE_SIZE {
+                self.reply_message_uuids.pop_front();
+            }
+        }
         result.push(ClientEvent::Broadcast(message));
         Ok(())
     }
@@ -183,7 +211,7 @@ impl Client {
         let mut has_read_data = false;
         let mut events = Vec::new();
         const BUFFER_SIZE: usize = 256;
-        const MAX_BUFFER_LENGTH: usize = 256*1024;
+        const MAX_BUFFER_LENGTH: usize = 256 * 1024;
 
         loop {
             let mut buffer = [0u8; BUFFER_SIZE];
@@ -191,11 +219,11 @@ impl Client {
                 Ok(length) => length,
                 Err(e) => {
                     return if has_read_data {
-                        self.readable = false;
-                        Ok(events)
-                    } else {
-                        Err(From::from(e))
-                    }
+                               self.readable = false;
+                               Ok(events)
+                           } else {
+                               Err(From::from(e))
+                           }
                 }
             };
 
@@ -251,4 +279,5 @@ impl Writeable<Message> for Client {
 pub enum ClientEvent {
     Disconnect,
     Broadcast(Message),
+    SendClients,
 }

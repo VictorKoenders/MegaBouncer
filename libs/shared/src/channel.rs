@@ -34,20 +34,29 @@ impl PartialEq<str> for Channel {
 impl Channel {
     pub fn from_string<T: ToString>(string: T) -> Channel {
         Channel {
-            parts: string.to_string().split('.').map(String::from).collect(),
+            parts: string.to_string()
+                .split('.')
+                .map(String::from)
+                .collect(),
             raw: string.to_string(),
         }
     }
 
     pub fn matches(&self, other: &Channel) -> bool {
         for i in 0..cmp::max(self.parts.len(), other.parts.len()) {
-            if i == self.parts.len() || i == other.parts.len() { return false; }
+            if i == self.parts.len() || i == other.parts.len() {
+                return false;
+            }
             if self.parts[i] == "*" {
-                if i == other.parts.len() - 1 || i == self.parts.len() - 1 { return true; }
+                if i == other.parts.len() - 1 || i == self.parts.len() - 1 {
+                    return true;
+                }
                 continue;
             }
             if other.parts[i] == "*" {
-                if i == self.parts.len() - 1 { return true; }
+                if i == self.parts.len() - 1 {
+                    return true;
+                }
                 continue;
             }
             if self.parts[i] != other.parts[i] {

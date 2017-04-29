@@ -14,5 +14,5 @@ pub use server::IrcServer;
 fn main() {
     let mut client = shared::Client::default();
     client.register::<connector::IrcConnector>();
-    client.start("TCP Connector");
+    client.start("IRC Connector");
 }

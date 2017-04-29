@@ -10,6 +10,7 @@ use uuid::Uuid;
 pub struct Message {
     pub id: MessageReply,
     pub action: ActionType,
+    pub sender: Option<String>,
     pub channel: Option<Channel>,
     pub data: Value,
 }
@@ -18,25 +19,46 @@ impl TryFrom<Message> for Vec<u8> {
     type Error = super::error::Error;
 
     fn try_from(message: Message) -> Result<Vec<u8>> {
-        let mut obj = Map::new();
-        message.id.inject_into(&mut obj);
-        obj.insert(String::from("action"), Value::String(message.action.to_string()));
-        if let Some(ref channel) = message.channel {
-            obj.insert("channel".to_owned(), Value::String(channel.to_string()));
-        }
-        obj.insert("data".to_owned(), message.data.clone());
-        let json = Value::Object(obj);
-        to_vec(&json).map_err(From::from)
+        to_vec(&message.to_json()).map_err(From::from)
     }
 }
 
 impl Message {
+    pub fn to_json(&self) -> Value {
+        let mut obj = Map::new();
+        self.id.inject_into(&mut obj);
+        obj.insert(String::from("action"),
+                   Value::String(self.action.to_string()));
+        if let Some(ref sender) = self.sender {
+            obj.insert(String::from("sender"), Value::String(sender.clone()));
+        }
+        if let Some(ref channel) = self.channel {
+            obj.insert("channel".to_owned(), Value::String(channel.to_string()));
+        }
+        obj.insert("data".to_owned(), self.data.clone());
+        Value::Object(obj)
+    }
+
+    pub fn new_connected_client(name: String) -> Message {
+        Message::new_emit("server.client.connected", |mut map| {
+            map.insert(String::from("name"), Value::String(name));
+        })
+    }
+
+    pub fn new_disconnected_client(name: String) -> Message {
+        Message::new_emit("server.client.disconnected", |mut map| {
+            map.insert(String::from("name"), Value::String(name));
+        })
+    }
+
     pub fn from_error<E: StdError>(error: E) -> Message {
         let mut obj = Map::new();
-        obj.insert("message".to_owned(), Value::String(error.description().to_string()));
+        obj.insert("message".to_owned(),
+                   Value::String(error.description().to_string()));
         Message {
             id: MessageReply::None,
             action: ActionType::Error,
+            sender: None,
             channel: None,
             data: Value::Object(obj),
         }
@@ -44,11 +66,13 @@ impl Message {
 
     pub fn from_error_with_description<E: StdError, T: ToString>(error: E, str: T) -> Message {
         let mut obj = Map::new();
-        obj.insert("message".to_owned(), Value::String(error.description().to_string()));
+        obj.insert("message".to_owned(),
+                   Value::String(error.description().to_string()));
         obj.insert("description".to_owned(), Value::String(str.to_string()));
         Message {
             id: MessageReply::None,
             action: ActionType::Error,
+            sender: None,
             channel: None,
             data: Value::Object(obj),
         }
@@ -59,6 +83,7 @@ impl Message {
         Message {
             id: MessageReply::None,
             action: ActionType::Error,
+            sender: None,
             channel: None,
             data: Value::Object(obj),
         }
@@ -67,53 +92,70 @@ impl Message {
     pub fn from_json(value: Value) -> Result<Message> {
         let v = &value;
         let value = value.as_object()
-            .ok_or_else(||Error::new_invalid_json("JSON value should be an object"))?;
+            .ok_or_else(|| Error::new_invalid_json("JSON value should be an object"))?;
 
-        let action = value
-            .get("action")
-            .ok_or_else(||Error::new_invalid_json("Root JSON object needs an action field"))?
-            .as_str()
-            .ok_or_else(||Error::new_invalid_json("Action field needs to be a string"))?;
-        
+        let action =
+            value.get("action")
+                .ok_or_else(|| Error::new_invalid_json("Root JSON object needs an action field"))?
+                .as_str()
+                .ok_or_else(|| Error::new_invalid_json("Action field needs to be a string"))?;
+
         let action = ActionType::from_str(action)
             .map_err(|_| Error::new_invalid_json(format!("Invalid action field, needs to be one of: {}", ActionType::default_types().join(", "))))?;
 
-        let channel = value
-            .get("channel")
+        let channel = value.get("channel")
             .and_then(|c| c.as_str())
-            .unwrap_or_else(||"")
+            .unwrap_or_else(|| "")
             .to_owned();
 
-        let data: Value = value
-            .get("data")
-            .map(|d| d.clone())
-            .unwrap_or_else(||Value::Null);
+        let data: Value = value.get("data").map(|d| d.clone()).unwrap_or_else(|| Value::Null);
 
         Ok(Message {
-            id: MessageReply::from_value(v),
-            action: action,
-            channel: Some(Channel::from_string(channel)),
-            data: data
-        })
+               id: MessageReply::from_value(v),
+               action: action,
+               sender: None,
+               channel: Some(Channel::from_string(channel)),
+               data: data,
+           })
     }
-    
+
+    pub fn new_no_reply_target_found(original_message: Message) -> Message {
+        Message {
+            id: MessageReply::None,
+            action: ActionType::Error,
+            sender: None,
+            channel: None,
+            data: Value::Object({
+                                    let mut map = Map::new();
+                                    map.insert(String::from("message"),
+                                               Value::String(String::from("Could not find reply")));
+                                    map.insert(String::from("original"),
+                                               original_message.to_json());
+                                    map
+                                }),
+        }
+    }
+
     pub fn new_identify<T: ToString>(name: &T) -> Message {
         Message {
             id: MessageReply::None,
             action: ActionType::Identify,
+            sender: None,
             channel: None,
             data: Value::Object({
-                let mut map = Map::new();
-                map.insert(String::from("name"), Value::String(name.to_string()));
-                map
-            }),
+                                    let mut map = Map::new();
+                                    map.insert(String::from("name"),
+                                               Value::String(name.to_string()));
+                                    map
+                                }),
         }
     }
-    
+
     pub fn new_register_listener<T: ToString>(channel: &T) -> Message {
         Message {
             id: MessageReply::None,
             action: ActionType::RegisterListener,
+            sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
             data: Value::Null,
         }
@@ -123,30 +165,35 @@ impl Message {
         Message {
             id: MessageReply::Reply(uuid),
             action: ActionType::Response,
+            sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
-            data: value
+            data: value,
         }
     }
-    
+
     pub fn new_forget_listener<T: ToString>(channel: &T) -> Message {
         Message {
             id: MessageReply::None,
             action: ActionType::ForgetListener,
+            sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
             data: Value::Null,
         }
     }
 
-    pub fn new_emit<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T, callback: C) -> Message {
+    pub fn new_emit<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T,
+                                                                       callback: C)
+                                                                       -> Message {
         Message {
             id: MessageReply::None,
             action: ActionType::Emit,
+            sender: None,
             channel: Some(Channel::from_string(channel)),
             data: Value::Object({
-                let mut map = Map::new();
-                callback(&mut map);
-                map
-            })
+                                    let mut map = Map::new();
+                                    callback(&mut map);
+                                    map
+                                }),
         }
     }
 }

@@ -27,6 +27,7 @@ class Connector extends EventEmitter {
         })
         this.on('newListener', (event, listener) => {
             if (typeof event === 'string' && this.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
+                console.log('registering listener ', event);
                 this.send({
                     action: 'register_listener',
                     channel: event
@@ -41,6 +42,14 @@ class Connector extends EventEmitter {
                 });
             }
         })
+    }
+
+    send_raw(action, channel, data) {
+        this.send({
+            action: action,
+            channel: channel,
+            data: data
+        });
     }
 
     send_emit(channel, data) {
@@ -89,6 +98,7 @@ class Connector extends EventEmitter {
             var n = 1;
             this.eventNames().forEach(listener => {
                 if (typeof listener === 'string' && !this._reserved_events.includes(listener)) {
+                    console.log('registering listener ', listener);
                     this._writequeue.splice(n++, 0, {
                         action: 'register_listener',
                         channel: listener
@@ -138,12 +148,12 @@ class Connector extends EventEmitter {
     }
 
     handle_action(msg) {
+        this.emit('*', msg);
         switch (msg.action) {
             case 'emit':
                 this.emit(msg.channel, msg.data);
                 break;
         }
-        console.log('got', msg);
     }
 }
 

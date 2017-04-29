@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Dashboard } from "./Dashboard";
 import { Chat } from "./Chat";
+import { Nodes } from "./Nodes";
 import { ContainerComponent } from "./ContainerComponent";
 
 class ContainerState {
@@ -9,11 +10,12 @@ class ContainerState {
 }
 
 export class Container extends React.Component<{}, ContainerState> {
-    constructor(){
+    constructor() {
         super();
         this.state = {
             components: Array<ContainerComponent>(
                 new Dashboard(),
+                new Nodes(),
                 new Chat()
             ),
             active_index: 0
@@ -23,18 +25,19 @@ export class Container extends React.Component<{}, ContainerState> {
             component.title_changed = this.component_title_changed.bind(this, component);
             component.state_changed = this.component_state_changed.bind(this, component);
         });
+        (window as any).container = this;
     }
     component_title_changed(component: ContainerComponent) {
         this.forceUpdate();
     }
     component_state_changed(component: ContainerComponent) {
         let index = this.state.components.indexOf(component);
-        if(index == this.state.active_index){
+        if (index == this.state.active_index) {
             this.forceUpdate();
         }
     }
-    
-    component_clicked(component: ContainerComponent, index: number, event: Event){
+
+    component_clicked(component: ContainerComponent, index: number, event: Event) {
         this.state.components[this.state.active_index].toggle_active(false);
         this.state.components[index].toggle_active(true);
         this.setState((current) => ({
