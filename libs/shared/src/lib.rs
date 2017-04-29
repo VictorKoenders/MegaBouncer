@@ -45,4 +45,5 @@ pub mod prelude {
         Event,
         Poll
     };
+    pub use ::uuid::Uuid;
 }

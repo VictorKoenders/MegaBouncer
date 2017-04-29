@@ -197,4 +197,12 @@ impl Message {
                                 }),
         }
     }
+
+    pub fn new_emit_with_id<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T,
+    callback: C) -> Message {
+        let mut message = Message::new_emit(channel, callback);
+        let id = Uuid::new_v4();
+        message.id = MessageReply::ID(id);
+        message
+    }
 }
