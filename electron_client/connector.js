@@ -12,8 +12,8 @@ class Connector extends EventEmitter {
     // Also send an even when we're connecting
     constructor() {
         super();
+        this._reply_listeners = [];
         this._data_buffer = '';
-        this._listeners = [];
         this._reserved_events = ['connected', 'disconnected', 'newListener', 'removeListener'];
         this._connected = false;
         this._writequeue = [];
@@ -27,7 +27,6 @@ class Connector extends EventEmitter {
         })
         this.on('newListener', (event, listener) => {
             if (typeof event === 'string' && this.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
-                console.log('registering listener ', event);
                 this.send({
                     action: 'register_listener',
                     channel: event
@@ -60,9 +59,25 @@ class Connector extends EventEmitter {
         });
     }
 
+    send_with_reply(channel, data, callback) {
+        function guid() {
+            function s4() {
+                return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+            }
+            return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+        }
+        var id = guid();
+        this._reply_listeners[id] = callback;
+        this.send({
+            action: 'emit',
+            channel: channel,
+            id: id,
+            data: data
+        });
+    }
+
     send(msg) {
         this._writequeue.push(msg);
-        console.log(this._writequeue);
         this.process_queue();
     }
 
@@ -70,7 +85,8 @@ class Connector extends EventEmitter {
         if (!this._connected) {
             return;
         }
-        this._socket.write(this._writequeue.map(item => JSON.stringify(item) + "\n").join());
+        let sending = this._writequeue.map(item => JSON.stringify(item)).join("\n") + "\n";
+        this._socket.write(sending);
         this._writequeue = [];
     }
 
@@ -98,7 +114,6 @@ class Connector extends EventEmitter {
             var n = 1;
             this.eventNames().forEach(listener => {
                 if (typeof listener === 'string' && !this._reserved_events.includes(listener)) {
-                    console.log('registering listener ', listener);
                     this._writequeue.splice(n++, 0, {
                         action: 'register_listener',
                         channel: listener
@@ -149,6 +164,14 @@ class Connector extends EventEmitter {
 
     handle_action(msg) {
         this.emit('*', msg);
+        if (msg.reply_to) {
+            var id = msg.reply_to;
+            if (this._reply_listeners[id]) {
+                this._reply_listeners[id](msg.data);
+                delete this._reply_listeners[id];
+            }
+            return;
+        }
         switch (msg.action) {
             case 'emit':
                 this.emit(msg.channel, msg.data);

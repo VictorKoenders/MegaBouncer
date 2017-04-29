@@ -1,8 +1,9 @@
-extern crate redis;
+extern crate serde_json;
 extern crate shared;
+extern crate redis;
 
-use shared::prelude::*;
 use redis::{Client, Commands, Connection};
+use shared::prelude::*;
 
 fn main() {
     // let client = Client::open("redis://redis-16682.c9.us-east-1-2.ec2.cloud.redislabs.com:16682").unwrap();
@@ -46,16 +47,34 @@ impl Component for RedisConnector {
                 }
             };
             let result: String = self.connection.get(key).unwrap_or_else(|_|String::new());
-            println!("Key {:?} is {:?}", key, result);
-            vec![ComponentResponse::Reply({
-                let mut map = Map::new();
-                map.insert(String::from("key"), Value::String(key.clone()));
-                map.insert(String::from("value"), Value::String(result));
-                Value::Object(map)
-            })]
+            vec![ComponentResponse::Reply(
+                if let Ok(value) = serde_json::from_str(&result) {
+                    value
+                } else {
+                    Value::String(result)
+                }
+            )]
         } else {
-            println!("{:?} {:?}", channel, message);
-            Vec::new()
+            let key = match message.as_object().map(|o| o.get("key")) {
+                Some(Some(&Value::String(ref str))) => str,
+                _ => {
+                    println!("Could not get key from {:?}", message);
+                    return Vec::new();
+                }
+            };
+            let value = match message.as_object().map(|o| o.get("value")) {
+                Some(Some(value)) => value.clone(),
+                _ => {
+                    println!("Could not get value from {:?}", message);
+                    return Vec::new();
+                }
+            };
+            self.connection.set::<&String, String, ()>(key, value.to_string()).unwrap();
+
+            let mut message = Message::new_emit(format!("data.{}", key), |_|{});
+            message.data = value;
+
+            vec![ComponentResponse::Send(message)]
         }
     }
 }

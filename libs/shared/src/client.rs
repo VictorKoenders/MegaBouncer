@@ -120,6 +120,9 @@ impl Client {
             ActionType::Emit if message.channel.is_some() => {
                 let inner_message = message.clone();
                 if let Some(channel) = message.channel {
+                    if let MessageReply::ID(ref uuid) = message.id {
+                        self.current_message = Some((channel.clone(), uuid.clone()));
+                    }
                     self.execute(|component, poll| {
                         if component.channels.iter().any(|c| c.matches(&channel)) {
                             component.component.message_received(poll, &channel, &inner_message.data)

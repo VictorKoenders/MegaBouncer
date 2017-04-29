@@ -110,8 +110,9 @@ impl Message {
 
         let data: Value = value.get("data").map(|d| d.clone()).unwrap_or_else(|| Value::Null);
 
+        let id = MessageReply::from_value(v);
         Ok(Message {
-               id: MessageReply::from_value(v),
+               id: id,
                action: action,
                sender: None,
                channel: Some(Channel::from_string(channel)),
@@ -164,7 +165,7 @@ impl Message {
     pub fn new_reply<T: ToString>(channel: &T, uuid: Uuid, value: Value) -> Message {
         Message {
             id: MessageReply::Reply(uuid),
-            action: ActionType::Response,
+            action: ActionType::Emit,
             sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
             data: value,

@@ -337,7 +337,7 @@ class Nodes extends ContainerComponent_1.ContainerComponent {
         }
     }
     any_received(message) {
-        //console.log(JSON.stringify(message));
+        console.log(JSON.stringify(message));
         if (message.sender) {
             var node = this.state.nodes.find(n => n.name == message.sender);
             if (node == null) {

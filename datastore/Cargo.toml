@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["victor.koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
-redis = "*"
 shared = { path = "../libs/shared" }
+serde_json = "*"
+redis = "*"

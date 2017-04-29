@@ -42,6 +42,7 @@ impl Client {
 
     pub fn try_accept_reply(&mut self, uuid: &Uuid, message: &Message) -> bool {
         if let Some(index) = self.reply_message_uuids.iter().position(|u| u == uuid) {
+            println!("Sending reply to {:?} ({:?})", self.name, message);
             self.try_send(message.clone());
             self.reply_message_uuids.remove(index);
             true

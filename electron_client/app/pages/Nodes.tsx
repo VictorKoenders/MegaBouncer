@@ -41,7 +41,7 @@ export class Nodes extends ContainerComponent {
     }
 
     any_received(message: any){
-        //console.log(JSON.stringify(message));
+        console.log(JSON.stringify(message));
         if(message.sender){
             var node = this.state.nodes.find(n => n.name == message.sender);
             if(node == null){
