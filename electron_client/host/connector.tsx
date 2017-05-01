@@ -1,49 +1,54 @@
-const EventEmitter = require("events").EventEmitter;
-const net = require("net");
+import { EventEmitter } from "events";
+import * as net from "net";
 
-const TIMEOUT_INTERVAL = 5000;
+const TIMEOUT_INTERVAL: number = 5000;
 
-class Connector extends EventEmitter {
-    // TODO: Connect to the network and listen to specific events
-    // Whenever a component registers an on(...) listener, send that listener to the server
-    //  - don't register "connected" and "disconnected" with the server
-    // whenever a component forgets it, remove the listener
-    // Whenever we disconnect, reconnect in 5 seconds or so and send an event
-    // Also send an even when we're connecting
+declare global {
+    interface Array<T> {
+        includes(searchElement: T): boolean;
+    }
+}
+
+type ReplyCallback = (message: any) => void;
+
+export default class Connector extends EventEmitter {
+    _reply_listeners: { [key:string]: ReplyCallback };
+    _data_buffer: string;
+    _reserved_events: Array<string> = ['connected', 'disconnected', 'newListener', 'removeListener'];
+    _connected: boolean = false;
+    _writequeue: Array<any>;
+    _socket: net.Socket;
+    _connect_timeout: number;
+
     constructor() {
         super();
-        this._reply_listeners = [];
-        this._data_buffer = '';
-        this._reserved_events = ['connected', 'disconnected', 'newListener', 'removeListener'];
-        this._connected = false;
-        this._writequeue = [];
 
         this.connect();
-        this.on('connected', () => {
+        super.on('connected', () => {
             this._connected = true;
         });
-        this.on('disconnected', () => {
+        super.on('disconnected', () => {
             this._connected = false;
         })
-        this.on('newListener', (event, listener) => {
-            if (typeof event === 'string' && this.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
+        super.on('newListener', (event: any, listener: any) => {
+            if (typeof event === 'string' && super.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
                 this.send({
                     action: 'register_listener',
                     channel: event
                 });
             }
         });
-        this.on('removeListener', (event, listener) => {
-            if (typeof event === 'string' && this.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
+        super.on('removeListener', (event: any, listener: any) => {
+            if (typeof event === 'string' && super.listenerCount(event) == 0 && !this._reserved_events.includes(event)) {
                 this.send({
                     action: 'register_listener',
                     channel: event
                 });
             }
-        })
+        });
     }
 
-    send_raw(action, channel, data) {
+    send_raw(action: string, channel: string, data: object) {
         this.send({
             action: action,
             channel: channel,
@@ -51,7 +56,7 @@ class Connector extends EventEmitter {
         });
     }
 
-    send_emit(channel, data) {
+    send_emit(channel: string, data: object) {
         this.send({
             action: 'emit',
             channel: channel,
@@ -59,7 +64,7 @@ class Connector extends EventEmitter {
         });
     }
 
-    send_with_reply(channel, data, callback) {
+    send_with_reply(channel: string, data: object, callback: ReplyCallback) {
         function guid() {
             function s4() {
                 return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
@@ -76,7 +81,7 @@ class Connector extends EventEmitter {
         });
     }
 
-    send(msg) {
+    send(msg: any) {
         this._writequeue.push(msg);
         this.process_queue();
     }
@@ -98,13 +103,13 @@ class Connector extends EventEmitter {
         this._socket.setEncoding('utf8');
         this._socket.unref();
         this._socket.on('close', had_error => {
-            this.emit('disconnected');
+            super.emit('disconnected');
             console.log('[Connector] Close! (had error? ' + (had_error ? 'yes' : 'no') + ')');
             clearTimeout(this._connect_timeout);
             this._connect_timeout = setTimeout(this.connect.bind(this), TIMEOUT_INTERVAL);
         });
         this._socket.on('connect', () => {
-            this.emit('connected');
+            super.emit('connected');
             this._writequeue.splice(0, 0, {
                 action: 'identify',
                 data: {
@@ -112,7 +117,7 @@ class Connector extends EventEmitter {
                 }
             });
             var n = 1;
-            this.eventNames().forEach(listener => {
+            super.eventNames().forEach(listener => {
                 if (typeof listener === 'string' && !this._reserved_events.includes(listener)) {
                     this._writequeue.splice(n++, 0, {
                         action: 'register_listener',
@@ -143,27 +148,27 @@ class Connector extends EventEmitter {
             this._data_buffer = split[split.length - 1];
         });
         this._socket.on('end', () => {
-            this.emit('disconnected');
+            super.emit('disconnected');
             console.log('[Connector] End!');
             clearTimeout(this._connect_timeout);
             this._connect_timeout = setTimeout(this.connect.bind(this), TIMEOUT_INTERVAL);
         });
         this._socket.on('error', error => {
-            this.emit('disconnected');
+            super.emit('disconnected');
             console.log('[Connector] Error! ', error);
             clearTimeout(this._connect_timeout);
             this._connect_timeout = setTimeout(this.connect.bind(this), TIMEOUT_INTERVAL);
         });
         this._socket.on('timeout', () => {
-            this.emit('disconnected');
+            super.emit('disconnected');
             console.log('[Connector] Timeout!');
             clearTimeout(this._connect_timeout);
             this._connect_timeout = setTimeout(this.connect.bind(this), TIMEOUT_INTERVAL);
         });
     }
 
-    handle_action(msg) {
-        this.emit('*', msg);
+    handle_action(msg: any) {
+        super.emit('*', msg);
         if (msg.reply_to) {
             var id = msg.reply_to;
             if (this._reply_listeners[id]) {
@@ -174,10 +179,9 @@ class Connector extends EventEmitter {
         }
         switch (msg.action) {
             case 'emit':
-                this.emit(msg.channel, msg.data);
+                super.emit(msg.channel, msg.data);
                 break;
         }
     }
 }
 
-module.exports = Connector;

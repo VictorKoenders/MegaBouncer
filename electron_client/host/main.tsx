@@ -1,18 +1,19 @@
-const electron = require('electron')
-// Module to control application life.
-const app = electron.app
-// Module to create native browser window.
-const BrowserWindow = electron.BrowserWindow
-const Connector = require("./connector");
+const electron = require('electron');
+import Connector from "./connector";
+import * as path from "path";
+import * as url from "url";
 
-const path = require('path')
-const url = require('url')
+declare var global: any;
+
+const app = electron.app
+const BrowserWindow = electron.BrowserWindow
+console.log('electron: ', electron);
 
 global.connector = new Connector();
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
+let mainWindow: any;
 
 function createWindow () {
   // Create the browser window.
