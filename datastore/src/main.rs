@@ -47,16 +47,14 @@ impl Component for RedisConnector {
                 }
             };
             let result: String = self.connection.get(key).unwrap_or_else(|_|String::new());
-            vec![ComponentResponse::Reply({
-                let mut map = Map::new();
-                map.insert(String::from("key"), Value::String(key.clone()));
-                map.insert(String::from("value"),if let Ok(value) = serde_json::from_str(&result) {
-                    value
-                } else {
-                    Value::String(result)
-                });
-                Value::Object(map)
-            })]
+            let mut message = Message::new_emit(format!("data.{}", key), |_|{});
+            
+            message.data = if let Ok(value) = serde_json::from_str(&result) {
+                value
+            } else {
+                Value::String(result)
+            };
+            vec![ComponentResponse::Send(message)]
         } else {
             let key = match message.as_object().map(|o| o.get("key")) {
                 Some(Some(&Value::String(ref str))) => str,

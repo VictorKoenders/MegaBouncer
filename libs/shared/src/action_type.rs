@@ -2,6 +2,7 @@ use std::string::ToString;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[deprecated]
 pub enum ActionType {
     RegisterListener,
     ForgetListener,

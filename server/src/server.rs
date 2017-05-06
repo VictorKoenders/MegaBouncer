@@ -1,10 +1,11 @@
-use shared::{ActionType, Value, Error, Result, Message, MessageReply};
 use mio::{Events, Token, Poll, PollOpt, Ready};
 use client::{Client, ClientEvent};
+use shared::{Error, MessageReply};
 use std::collections::HashMap;
 use mio::tcp::TcpListener;
 use rangetree::RangeTree;
 //use mio::timer::Timer;
+use shared::prelude::*;
 
 const SERVER_TOKEN: Token = Token(0);
 
@@ -124,16 +125,14 @@ impl Server {
     }
 
     fn broadcast(&mut self, message: Message) {
-        if let ActionType::Emit = message.action {
-            if let Some(channel) = message.channel.clone() {
-                for client in self.clients.values_mut().filter(|c| c.is_listening_to(&channel)) {
-                    client.write(message.clone());
-
-                }
-            }
-        } else {
+        if REPLY.is(&message.channel) {
             for client in self.clients.values_mut() {
                 client.write(message.clone());
+            }
+        } else if let Some(channel) = message.channel.clone() {
+            for client in self.clients.values_mut().filter(|c| c.is_listening_to(&channel)) {
+                client.write(message.clone());
+
             }
         }
     }

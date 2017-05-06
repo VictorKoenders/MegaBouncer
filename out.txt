@@ -1,0 +1,22 @@
+
+D:\Development\Personal\rust_megabouncer>cd server 
+
+D:\Development\Personal\rust_megabouncer\server>cargo check 
+
+D:\Development\Personal\rust_megabouncer\server>cd ../tcp_connector 
+
+D:\Development\Personal\rust_megabouncer\tcp_connector>cargo check 
+
+D:\Development\Personal\rust_megabouncer\tcp_connector>cd ../irc_connector 
+
+D:\Development\Personal\rust_megabouncer\irc_connector>cargo check 
+
+D:\Development\Personal\rust_megabouncer\irc_connector>cd ../test_client 
+
+D:\Development\Personal\rust_megabouncer\test_client>cargo check 
+
+D:\Development\Personal\rust_megabouncer\test_client>cd ../datastore 
+
+D:\Development\Personal\rust_megabouncer\datastore>cargo check 
+
+D:\Development\Personal\rust_megabouncer\datastore>cd ../ 
