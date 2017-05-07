@@ -19,12 +19,13 @@ struct RedisConnector {
 impl Default for RedisConnector {
     fn default() -> RedisConnector {
         let mut config = config::Config::new();
-        config.merge(config::File::from_str(include_str!("../config.toml"), config::FileFormat::Toml)).unwrap();
-        let host = config.get("redis-url").unwrap().into_str().unwrap();
+        let config_file = config::File::from_str(include_str!("../config.toml"), config::FileFormat::Toml).required(true);
+        config.merge(config_file).expect("Loading config.toml");
+        let host = config.get("redis-url").expect("Getting redis url").into_str().expect("Unwrapping redis url as string");
         let host: &str = &host;
 
-        let client = Client::open(host).unwrap();
-        let con: Connection = client.get_connection().unwrap();
+        let client = Client::open(host).expect("Connection to redis client");
+        let con: Connection = client.get_connection().expect("Opening redis connection");
         RedisConnector {
             connection: con
         }
