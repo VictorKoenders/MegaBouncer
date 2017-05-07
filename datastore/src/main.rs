@@ -1,16 +1,12 @@
 extern crate serde_json;
 extern crate shared;
 extern crate redis;
+extern crate config;
 
 use redis::{Client, Commands, Connection};
 use shared::prelude::*;
 
 fn main() {
-    // let client = Client::open("redis://redis-16682.c9.us-east-1-2.ec2.cloud.redislabs.com:16682").unwrap();
-    // let con: Connection = client.get_connection().unwrap();
-    // let count: i32 = con.get("counter").unwrap_or(0);
-    // println!("Counter: {}", count);
-    // con.set::<&str, i32, ()>("counter", count + 1).unwrap();
     let mut client = shared::Client::default();
     client.register::<RedisConnector>();
     client.start("datastore");
@@ -22,7 +18,12 @@ struct RedisConnector {
 
 impl Default for RedisConnector {
     fn default() -> RedisConnector {
-        let client = Client::open("redis://redis-16682.c9.us-east-1-2.ec2.cloud.redislabs.com:16682").unwrap();
+        let mut config = config::Config::new();
+        config.merge(config::File::from_str(include_str!("../config.toml"), config::FileFormat::Toml)).unwrap();
+        let host = config.get("redis-url").unwrap().into_str().unwrap();
+        let host: &str = &host;
+
+        let client = Client::open(host).unwrap();
         let con: Connection = client.get_connection().unwrap();
         RedisConnector {
             connection: con

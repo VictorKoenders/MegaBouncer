@@ -7,3 +7,4 @@ authors = ["victor.koenders <victor.koenders@gmail.com>"]
 shared = { path = "../libs/shared" }
 serde_json = "*"
 redis = "*"
+config = "*"
