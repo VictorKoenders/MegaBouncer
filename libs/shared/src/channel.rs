@@ -7,6 +7,15 @@ pub struct Channel {
     raw: String,
 }
 
+lazy_static! {
+    pub static ref REGISTER_LISTENER: Channel = Channel::from_string("client.listener.register");
+    pub static ref FORGET_LISTENER: Channel = Channel::from_string("client.listener.forget");
+    pub static ref LIST_CLIENTS: Channel = Channel::from_string("client.list");
+    pub static ref IDENTIFY: Channel = Channel::from_string("client.identify");
+    pub static ref REPLY: Channel = Channel::from_string("reply");
+    pub static ref ERROR: Channel = Channel::from_string("error");
+}
+
 impl Debug for Channel {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "Channel({:?})", self.raw)
@@ -39,6 +48,14 @@ impl Channel {
                 .map(String::from)
                 .collect(),
             raw: string.to_string(),
+        }
+    }
+
+    pub fn is(&self, other: &Option<Channel>) -> bool {
+        if let &Some(ref other) = other {
+            self.raw.eq(&other.raw)
+        } else {
+            false
         }
     }
 

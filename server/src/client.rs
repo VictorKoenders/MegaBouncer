@@ -1,12 +1,13 @@
 use shared::writeable::{Writeable, WriteQueue};
-use shared::{ActionType, Channel, Message, MessageReply};
+use shared::{Channel, Message, MessageReply};
 use std::collections::VecDeque;
 use serde_json::{self, Value};
 use shared::{Error, Result, Uuid};
-use std::io::Read;
 use std::net::SocketAddr;
 use mio::tcp::TcpStream;
+use shared::prelude::*;
 use std::convert::From;
+use std::io::Read;
 
 const REPLY_MESSAGE_DEQUE_SIZE: usize = 5;
 
@@ -146,6 +147,7 @@ impl Client {
         Ok(())
     }
 
+    /*
     fn try_get_listeners(&mut self,
                          _message: Message,
                          _result: &mut Vec<ClientEvent>)
@@ -153,12 +155,14 @@ impl Client {
         println!("Not implemented: try_get_listeners");
         Ok(())
     }
+    */
 
     fn try_get_clients(&mut self, _message: Message, result: &mut Vec<ClientEvent>) -> Result<()> {
         result.push(ClientEvent::SendClients);
         Ok(())
     }
 
+    /*
     fn try_get_response(&mut self,
                         _message: Message,
                         _result: &mut Vec<ClientEvent>)
@@ -171,6 +175,7 @@ impl Client {
         println!("Not implemented: try_log_error");
         Ok(())
     }
+    */
 
     fn try_emit(&mut self, message: Message, result: &mut Vec<ClientEvent>) -> Result<()> {
         if let MessageReply::ID(uuid) = message.id {
@@ -187,7 +192,21 @@ impl Client {
         let value: Value = serde_json::from_str(line.trim())?;
         let message = Message::from_json(value)?;
         let mut result = Vec::new();
-        match message.action {
+        if IDENTIFY.is(&message.channel){
+            self.try_identify(message, &mut result)?;
+        } else if REGISTER_LISTENER.is(&message.channel) {
+            self.try_register_listener(message, &mut result)?;
+        } else if FORGET_LISTENER.is(&message.channel) {
+            self.try_forget_listener(message, &mut result)?;
+        } else if LIST_CLIENTS.is(&message.channel) {
+            self.try_get_clients(message, &mut result)?;
+        } /*else if ERROR.is(message.channel) {
+            self.try_log_error(message, &mut result)?;
+        }*/ else {
+            self.try_emit(message, &mut result)?;
+        }
+
+        /*match message.action {
             ActionType::Identify => self.try_identify(message, &mut result)?,
             ActionType::RegisterListener => self.try_register_listener(message, &mut result)?,
             ActionType::ForgetListener => self.try_forget_listener(message, &mut result)?,
@@ -196,7 +215,7 @@ impl Client {
             ActionType::Response => self.try_get_response(message, &mut result)?,
             ActionType::Error => self.try_log_error(message, &mut result)?,
             ActionType::Emit => self.try_emit(message, &mut result)?,
-        };
+        };*/
         Ok(result)
     }
 

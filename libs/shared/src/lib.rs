@@ -1,6 +1,7 @@
 #![deny(warnings)]
 #![feature(try_from)]
 
+#[macro_use] extern crate lazy_static;
 extern crate serde_json;
 extern crate uuid;
 extern crate mio;
@@ -8,7 +9,6 @@ extern crate mio;
 mod component_wrapper;
 pub mod writeable;
 mod message_reply;
-mod action_type;
 mod component;
 mod message;
 mod channel;
@@ -18,7 +18,6 @@ mod error;
 pub use component::{Component, ComponentResponse};
 pub use component_wrapper::ComponentWrapper;
 pub use message_reply::MessageReply;
-pub use action_type::ActionType;
 pub use error::{Error, Result};
 pub use serde_json::Value;
 pub use message::Message;
@@ -44,6 +43,14 @@ pub mod prelude {
     pub use ::mio::{
         Event,
         Poll
+    };
+    pub use ::channel::{
+        REGISTER_LISTENER,
+        FORGET_LISTENER,
+        LIST_CLIENTS,
+        IDENTIFY,
+        REPLY,
+        ERROR
     };
     pub use ::uuid::Uuid;
 }

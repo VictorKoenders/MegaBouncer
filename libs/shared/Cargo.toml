@@ -7,3 +7,4 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 serde_json = "*"
 mio = "*"
 uuid = { version = "*", features = ["v4"] }
+lazy_static = "*"

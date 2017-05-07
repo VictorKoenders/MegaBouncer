@@ -14,10 +14,9 @@ pub struct IrcServer {
 
 impl IrcServer {
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
-        match message {
-            Message::Ping(ref msg) => response.push(self.send_raw(Message::Pong(msg.clone()))),
-            _ => {}
-        };
+        if let Message::Ping(ref msg) = message {
+            response.push(self.send_raw(Message::Pong(msg.clone())));
+        }
         response.push(ComponentResponse::Send(::shared::Message::new_emit("irc.message", |map| {
             map.insert(String::from("host"), Value::String(self.host.clone()));
             map.insert(String::from("port"), Value::Number(self.port.into()));

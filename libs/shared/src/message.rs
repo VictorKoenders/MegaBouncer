@@ -1,15 +1,14 @@
-use super::{ActionType, Channel, MessageReply};
+use super::{Channel, MessageReply};
 use serde_json::{Map, Value, to_vec};
 use std::error::Error as StdError;
 use super::error::{Error, Result};
 use std::convert::TryFrom;
-use std::str::FromStr;
+//use std::str::FromStr;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Message {
     pub id: MessageReply,
-    pub action: ActionType,
     pub sender: Option<String>,
     pub channel: Option<Channel>,
     pub data: Value,
@@ -27,8 +26,6 @@ impl Message {
     pub fn to_json(&self) -> Value {
         let mut obj = Map::new();
         self.id.inject_into(&mut obj);
-        obj.insert(String::from("action"),
-                   Value::String(self.action.to_string()));
         if let Some(ref sender) = self.sender {
             obj.insert(String::from("sender"), Value::String(sender.clone()));
         }
@@ -57,9 +54,8 @@ impl Message {
                    Value::String(error.description().to_string()));
         Message {
             id: MessageReply::None,
-            action: ActionType::Error,
             sender: None,
-            channel: None,
+            channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
         }
     }
@@ -71,9 +67,8 @@ impl Message {
         obj.insert("description".to_owned(), Value::String(str.to_string()));
         Message {
             id: MessageReply::None,
-            action: ActionType::Error,
             sender: None,
-            channel: None,
+            channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
         }
     }
@@ -82,9 +77,8 @@ impl Message {
         obj.insert("message".to_owned(), Value::String(error.to_string()));
         Message {
             id: MessageReply::None,
-            action: ActionType::Error,
             sender: None,
-            channel: None,
+            channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
         }
     }
@@ -94,38 +88,26 @@ impl Message {
         let value = value.as_object()
             .ok_or_else(|| Error::new_invalid_json("JSON value should be an object"))?;
 
-        let action =
-            value.get("action")
-                .ok_or_else(|| Error::new_invalid_json("Root JSON object needs an action field"))?
-                .as_str()
-                .ok_or_else(|| Error::new_invalid_json("Action field needs to be a string"))?;
-
-        let action = ActionType::from_str(action)
-            .map_err(|_| Error::new_invalid_json(format!("Invalid action field, needs to be one of: {}", ActionType::default_types().join(", "))))?;
-
         let channel = value.get("channel")
             .and_then(|c| c.as_str())
-            .unwrap_or_else(|| "")
-            .to_owned();
+            .map(Channel::from_string);
 
         let data: Value = value.get("data").map(|d| d.clone()).unwrap_or_else(|| Value::Null);
 
         let id = MessageReply::from_value(v);
         Ok(Message {
-               id: id,
-               action: action,
-               sender: None,
-               channel: Some(Channel::from_string(channel)),
-               data: data,
-           })
+            id: id,
+            sender: None,
+            channel: channel,
+            data: data,
+        })
     }
 
     pub fn new_no_reply_target_found(original_message: Message) -> Message {
         Message {
             id: MessageReply::None,
-            action: ActionType::Error,
             sender: None,
-            channel: None,
+            channel: Some(::channel::ERROR.clone()),
             data: Value::Object({
                                     let mut map = Map::new();
                                     map.insert(String::from("message"),
@@ -140,9 +122,8 @@ impl Message {
     pub fn new_identify<T: ToString>(name: &T) -> Message {
         Message {
             id: MessageReply::None,
-            action: ActionType::Identify,
             sender: None,
-            channel: None,
+            channel: Some(::channel::IDENTIFY.clone()),
             data: Value::Object({
                                     let mut map = Map::new();
                                     map.insert(String::from("name"),
@@ -155,17 +136,19 @@ impl Message {
     pub fn new_register_listener<T: ToString>(channel: &T) -> Message {
         Message {
             id: MessageReply::None,
-            action: ActionType::RegisterListener,
             sender: None,
-            channel: Some(Channel::from_string(channel.to_string())),
-            data: Value::Null,
+            channel: Some(::channel::REGISTER_LISTENER.clone()),
+            data: Value::Object({
+                let mut map = Map::new();
+                map.insert(String::from("channel"), Value::String(channel.to_string()));
+                map
+            }),
         }
     }
 
     pub fn new_reply<T: ToString>(channel: &T, uuid: Uuid, value: Value) -> Message {
         Message {
             id: MessageReply::Reply(uuid),
-            action: ActionType::Emit,
             sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
             data: value,
@@ -175,10 +158,13 @@ impl Message {
     pub fn new_forget_listener<T: ToString>(channel: &T) -> Message {
         Message {
             id: MessageReply::None,
-            action: ActionType::ForgetListener,
             sender: None,
-            channel: Some(Channel::from_string(channel.to_string())),
-            data: Value::Null,
+            channel: Some(::channel::FORGET_LISTENER.clone()),
+            data: Value::Object({
+                let mut map = Map::new();
+                map.insert(String::from("channel"), Value::String(channel.to_string()));
+                map
+            }),
         }
     }
 
@@ -187,7 +173,6 @@ impl Message {
                                                                        -> Message {
         Message {
             id: MessageReply::None,
-            action: ActionType::Emit,
             sender: None,
             channel: Some(Channel::from_string(channel)),
             data: Value::Object({

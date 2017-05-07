@@ -2,7 +2,7 @@ const webpack = require("webpack");
 
 module.exports = {
     entry: {
-        host: "./host/main.tsx",
+        connector: "./host/connector.tsx",
         app: "./app/index.tsx"
     },
     output: {
