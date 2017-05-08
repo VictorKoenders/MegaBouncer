@@ -1,14 +1,14 @@
-use super::{Channel, MessageReply};
+use super::Channel; //, MessageReply};
 use serde_json::{Map, Value, to_vec};
 use std::error::Error as StdError;
 use super::error::{Error, Result};
 use std::convert::TryFrom;
 //use std::str::FromStr;
-use uuid::Uuid;
+//use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Message {
-    pub id: MessageReply,
+    //pub id: MessageReply,
     pub sender: Option<String>,
     pub channel: Option<Channel>,
     pub data: Value,
@@ -25,7 +25,7 @@ impl TryFrom<Message> for Vec<u8> {
 impl Message {
     pub fn to_json(&self) -> Value {
         let mut obj = Map::new();
-        self.id.inject_into(&mut obj);
+        //self.id.inject_into(&mut obj);
         if let Some(ref sender) = self.sender {
             obj.insert(String::from("sender"), Value::String(sender.clone()));
         }
@@ -53,7 +53,7 @@ impl Message {
         obj.insert("message".to_owned(),
                    Value::String(error.description().to_string()));
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
@@ -66,7 +66,7 @@ impl Message {
                    Value::String(error.description().to_string()));
         obj.insert("description".to_owned(), Value::String(str.to_string()));
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
@@ -76,7 +76,7 @@ impl Message {
         let mut obj = Map::new();
         obj.insert("message".to_owned(), Value::String(error.to_string()));
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::ERROR.clone()),
             data: Value::Object(obj),
@@ -84,7 +84,7 @@ impl Message {
     }
 
     pub fn from_json(value: Value) -> Result<Message> {
-        let v = &value;
+        //let v = &value;
         let value = value.as_object()
             .ok_or_else(|| Error::new_invalid_json("JSON value should be an object"))?;
 
@@ -94,9 +94,9 @@ impl Message {
 
         let data: Value = value.get("data").map(|d| d.clone()).unwrap_or_else(|| Value::Null);
 
-        let id = MessageReply::from_value(v);
+        //let id = MessageReply::from_value(v);
         Ok(Message {
-            id: id,
+            //id: id,
             sender: None,
             channel: channel,
             data: data,
@@ -105,7 +105,7 @@ impl Message {
 
     pub fn new_no_reply_target_found(original_message: Message) -> Message {
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::ERROR.clone()),
             data: Value::Object({
@@ -121,7 +121,7 @@ impl Message {
 
     pub fn new_identify<T: ToString>(name: &T) -> Message {
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::IDENTIFY.clone()),
             data: Value::Object({
@@ -135,7 +135,7 @@ impl Message {
 
     pub fn new_register_listener<T: ToString>(channel: &T) -> Message {
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::REGISTER_LISTENER.clone()),
             data: Value::Object({
@@ -146,18 +146,18 @@ impl Message {
         }
     }
 
-    pub fn new_reply<T: ToString>(channel: &T, uuid: Uuid, value: Value) -> Message {
+    /*pub fn new_reply<T: ToString>(channel: &T, uuid: Uuid, value: Value) -> Message {
         Message {
             id: MessageReply::Reply(uuid),
             sender: None,
             channel: Some(Channel::from_string(channel.to_string())),
             data: value,
         }
-    }
+    }*/
 
     pub fn new_forget_listener<T: ToString>(channel: &T) -> Message {
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(::channel::FORGET_LISTENER.clone()),
             data: Value::Object({
@@ -172,7 +172,7 @@ impl Message {
                                                                        callback: C)
                                                                        -> Message {
         Message {
-            id: MessageReply::None,
+            //id: MessageReply::None,
             sender: None,
             channel: Some(Channel::from_string(channel)),
             data: Value::Object({
@@ -183,11 +183,11 @@ impl Message {
         }
     }
 
-    pub fn new_emit_with_id<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T,
+    /*pub fn new_emit_with_id<T: ToString, C: FnOnce((&mut Map<String, Value>))>(channel: T,
     callback: C) -> Message {
         let mut message = Message::new_emit(channel, callback);
         let id = Uuid::new_v4();
         message.id = MessageReply::ID(id);
         message
-    }
+    }*/
 }

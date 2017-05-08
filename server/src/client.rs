@@ -1,15 +1,15 @@
 use shared::writeable::{Writeable, WriteQueue};
-use shared::{Channel, Message, MessageReply};
+use shared::{Channel, Message}; //, MessageReply};
 use std::collections::VecDeque;
 use serde_json::{self, Value};
-use shared::{Error, Result, Uuid};
+use shared::{Error, Result};//, Uuid};
 use std::net::SocketAddr;
 use mio::tcp::TcpStream;
 use shared::prelude::*;
 use std::convert::From;
 use std::io::Read;
 
-const REPLY_MESSAGE_DEQUE_SIZE: usize = 5;
+//const REPLY_MESSAGE_DEQUE_SIZE: usize = 5;
 
 pub struct Client {
     socket: TcpStream,
@@ -22,7 +22,7 @@ pub struct Client {
     channels: Vec<Channel>,
     write_buffer: VecDeque<Message>,
     write_buffer_bytes: Vec<u8>,
-    reply_message_uuids: VecDeque<Uuid>,
+    //reply_message_uuids: VecDeque<Uuid>,
 }
 
 impl Client {
@@ -37,20 +37,20 @@ impl Client {
             channels: Vec::new(),
             write_buffer: VecDeque::new(),
             write_buffer_bytes: Vec::new(),
-            reply_message_uuids: VecDeque::with_capacity(REPLY_MESSAGE_DEQUE_SIZE),
+            //reply_message_uuids: VecDeque::with_capacity(REPLY_MESSAGE_DEQUE_SIZE),
         }
     }
 
-    pub fn try_accept_reply(&mut self, uuid: &Uuid, message: &Message) -> bool {
-        if let Some(index) = self.reply_message_uuids.iter().position(|u| u == uuid) {
-            println!("Sending reply to {:?} ({:?})", self.name, message);
-            self.try_send(message.clone());
-            self.reply_message_uuids.remove(index);
-            true
-        } else {
-            false
-        }
-    }
+    // pub fn try_accept_reply(&mut self, uuid: &Uuid, message: &Message) -> bool {
+    //     if let Some(index) = self.reply_message_uuids.iter().position(|u| u == uuid) {
+    //         println!("Sending reply to {:?} ({:?})", self.name, message);
+    //         self.try_send(message.clone());
+    //         self.reply_message_uuids.remove(index);
+    //         true
+    //     } else {
+    //         false
+    //     }
+    // }
 
     pub fn set_readable(&mut self, is_readable: bool) {
         self.readable = is_readable;
@@ -102,19 +102,18 @@ impl Client {
         if !self.has_name() {
             return Ok(());
         }
-        let channel = match message.channel {
-            None => {
+        let channel = match message.data.as_object().map(|o| o.get("channel")) {
+            Some(Some(&Value::String(ref c))) => Channel::from_string(c),
+            _ => {
                 self.write_buffer.push_back(Message::from_error_string("Channel required with RegisterListener action"));
                 return Ok(());
             }
-            Some(c) => Channel::from_string(c),
         };
         let channel_string = channel.to_string();
         self.channels.push(channel);
         let message = Message::new_emit("client.listener.register", |map| {
             map.insert(String::from("channel"), Value::String(channel_string));
-            map.insert(String::from("client"),
-                       Value::String(self.name.clone().unwrap()));
+            map.insert(String::from("client"), Value::String(self.name.clone().unwrap()));
         });
         result.push(ClientEvent::Broadcast(message));
         Ok(())
@@ -178,12 +177,12 @@ impl Client {
     */
 
     fn try_emit(&mut self, message: Message, result: &mut Vec<ClientEvent>) -> Result<()> {
-        if let MessageReply::ID(uuid) = message.id {
-            self.reply_message_uuids.push_back(uuid);
-            if self.reply_message_uuids.len() > REPLY_MESSAGE_DEQUE_SIZE {
-                self.reply_message_uuids.pop_front();
-            }
-        }
+        // if let MessageReply::ID(uuid) = message.id {
+        //     self.reply_message_uuids.push_back(uuid);
+        //     if self.reply_message_uuids.len() > REPLY_MESSAGE_DEQUE_SIZE {
+        //         self.reply_message_uuids.pop_front();
+        //     }
+        // }
         result.push(ClientEvent::Broadcast(message));
         Ok(())
     }

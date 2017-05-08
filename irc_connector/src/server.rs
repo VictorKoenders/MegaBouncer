@@ -13,6 +13,17 @@ pub struct IrcServer {
 }
 
 impl IrcServer {
+    pub fn from_json(value: &Value) -> Vec<IrcServer> {
+        let _arr = match *value {
+            Value::Array(ref arr) => arr,
+            _ => return Vec::new()
+        };
+
+        // TODO: Implement
+
+        Vec::new()
+    }
+
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
         if let Message::Ping(ref msg) = message {
             response.push(self.send_raw(Message::Pong(msg.clone())));

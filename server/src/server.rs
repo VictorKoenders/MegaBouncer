@@ -1,6 +1,6 @@
 use mio::{Events, Token, Poll, PollOpt, Ready};
 use client::{Client, ClientEvent};
-use shared::{Error, MessageReply};
+use shared::Error; //, MessageReply};
 use std::collections::HashMap;
 use mio::tcp::TcpListener;
 use rangetree::RangeTree;
@@ -125,6 +125,7 @@ impl Server {
     }
 
     fn broadcast(&mut self, message: Message) {
+        //println!("Broadcasting {:?}", message);
         if REPLY.is(&message.channel) {
             for client in self.clients.values_mut() {
                 client.write(message.clone());
@@ -171,16 +172,16 @@ impl Server {
                 }
 
                 ClientEvent::Broadcast(mut message) => {
-                    if let MessageReply::Reply(uuid) = message.id {
-                        if !self.clients.values_mut().any(|c| c.try_accept_reply(&uuid, &message)) {
-                            if let Some(ref mut client) = self.clients.get_mut(token) {
-                                client.try_send(Message::new_no_reply_target_found(message));
-                            }
-                        }
-                    } else {
+                    // if let MessageReply::Reply(uuid) = message.id {
+                    //     if !self.clients.values_mut().any(|c| c.try_accept_reply(&uuid, &message)) {
+                    //         if let Some(ref mut client) = self.clients.get_mut(token) {
+                    //             client.try_send(Message::new_no_reply_target_found(message));
+                    //         }
+                    //     }
+                    // } else {
                         message.sender = self.clients.get(token).and_then(|c| c.name.clone());
                         messages_to_broadcast.push(message);
-                    }
+                    // }
                 }
             }
         }

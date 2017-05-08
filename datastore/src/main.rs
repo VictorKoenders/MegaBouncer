@@ -26,6 +26,7 @@ impl Default for RedisConnector {
 
         let client = Client::open(host).expect("Connection to redis client");
         let con: Connection = client.get_connection().expect("Opening redis connection");
+
         RedisConnector {
             connection: con
         }
@@ -48,7 +49,8 @@ impl Component for RedisConnector {
                     return Vec::new();
                 }
             };
-            let result: String = self.connection.get(key).unwrap_or_else(|_|String::new());
+            // println!("Getting data with key {:?}", key);
+            let result: String = self.connection.get(key).unwrap_or_else(|_|String::from("{}"));
             let mut message = Message::new_emit(format!("data.{}", key), |_|{});
             
             message.data = if let Ok(value) = serde_json::from_str(&result) {

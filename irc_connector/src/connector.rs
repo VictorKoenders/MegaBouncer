@@ -110,7 +110,8 @@ impl Component for IrcConnector {
             ComponentResponse::ListenToChannel(Channel::from_string("tcp.connected")),
             ComponentResponse::ListenToChannel(Channel::from_string("tcp.data")),
             ComponentResponse::ListenToChannel(Channel::from_string("tcp.disconnected")),
-            ComponentResponse::Send(Message::new_emit_with_id("data.get_by_key", |mut map| {
+            ComponentResponse::ListenToChannel(Channel::from_string("data.irc.config")),
+            ComponentResponse::Send(Message::new_emit("data.get_by_key", |mut map| {
                 map.insert(String::from("key"), Value::String(String::from("irc.config")));
             })),
         ];
@@ -118,16 +119,16 @@ impl Component for IrcConnector {
         vec
     }
 
-    fn reply_received(&mut self, _poll: &Poll, _uuid: Uuid, channel: &Option<Channel>, message: &Value) -> Vec<ComponentResponse> {
-        let key = match message.as_object().and_then(|o| o.get("key")) {
-            Some(&Value::String(ref key)) if key == "irc.config" => { println!("IRC Config!"); key },
-            Some(&Value::String(ref key)) => { println!("Unknown key: {:?}", key); key },
-            Some(x) => { println!("Unknown reply: {:?}", x); return Vec::new(); },
-            None => { println!("Reply has no key: {:?}", message); return Vec::new(); }
-        };
-        println!("Got reply: {:?} {:?} {:?}", channel, key, message);
-        Vec::new()
-    }
+    // fn reply_received(&mut self, _poll: &Poll, _uuid: Uuid, channel: &Option<Channel>, message: &Value) -> Vec<ComponentResponse> {
+    //     let key = match message.as_object().and_then(|o| o.get("key")) {
+    //         Some(&Value::String(ref key)) if key == "irc.config" => { println!("IRC Config!"); key },
+    //         Some(&Value::String(ref key)) => { println!("Unknown key: {:?}", key); key },
+    //         Some(x) => { println!("Unknown reply: {:?}", x); return Vec::new(); },
+    //         None => { println!("Reply has no key: {:?}", message); return Vec::new(); }
+    //     };
+    //     println!("Got reply: {:?} {:?} {:?}", channel, key, message);
+    //     Vec::new()
+    // }
 
     fn message_received(&mut self, _poll: &Poll, channel: &Channel, message: &Value) -> Vec<ComponentResponse>{
         let mut response = Vec::new();

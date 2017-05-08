@@ -1,4 +1,4 @@
-use super::{Channel, Component, ComponentResponse, ComponentWrapper, Message, MessageReply, Uuid};
+use super::{Channel, Component, ComponentResponse, ComponentWrapper, Message}; //, MessageReply, Uuid};
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use super::writeable::{Writeable, WriteQueue};
 use serde_json::{from_str, Value};
@@ -17,7 +17,7 @@ pub struct Client {
     writeable: bool,
     running: bool,
     pub name: Option<String>,
-    current_message: Option<(Channel, Uuid)>,
+    //current_message: Option<(Channel, Uuid)>,
 }
 
 impl Default for Client {
@@ -33,7 +33,7 @@ impl Default for Client {
             writeable: false,
             running: true,
             name: None,
-            current_message: None,
+            //current_message: None,
         }
     }
 }
@@ -74,13 +74,13 @@ impl Client {
                         ComponentResponse::RemoveToken(token) => {
                             component.tokens.retain(|t| *t != token);
                         },
-                        ComponentResponse::Reply(value) => {
-                            if let Some((channel, uuid)) = self.current_message.clone() {
-                                messages_to_send.push_back(Message::new_reply(&channel, uuid, value));
-                            }
-                        },
-                        ComponentResponse::Send(mut message) => {
-                            message.id = MessageReply::ID(Uuid::new_v4());
+                        // ComponentResponse::Reply(value) => {
+                        //     if let Some((channel, uuid)) = self.current_message.clone() {
+                        //         messages_to_send.push_back(Message::new_reply(&channel, uuid, value));
+                        //     }
+                        // },
+                        ComponentResponse::Send(message) => {
+                            //message.id = MessageReply::ID(Uuid::new_v4());
                             messages_to_send.push_back(message);
                         },
                         ComponentResponse::RemoveSelf => unimplemented!(),
@@ -110,21 +110,22 @@ impl Client {
     }
 
     fn handle_message(&mut self, message: Message){
+        //println!("Got message {:?}", message);
         if ::channel::IDENTIFY.is(&message.channel) {
             if let Some(Some(&Value::String(ref str))) = message.data.as_object().map(|o| o.get("name")) {
                 self.execute(|component, poll| component.component.node_connected(poll, str));
             }
-        } else if message.id.is_reply() {
+        } /*else if message.id.is_reply() {
             let uuid = if let MessageReply::Reply(uuid) = message.id { uuid } else { unreachable!() };
             self.execute(|component, poll| 
                 component.component.reply_received(poll, uuid, &message.channel, &message.data)
             );
-        } else if message.channel.is_some() {
+        }*/ else if message.channel.is_some() {
             let inner_message = message.clone();
             if let Some(channel) = message.channel {
-                if let MessageReply::ID(ref uuid) = message.id {
+                /*if let MessageReply::ID(ref uuid) = message.id {
                     self.current_message = Some((channel.clone(), uuid.clone()));
-                }
+                }*/
                 self.execute(|component, poll| {
                     if component.channels.iter().any(|c| c.matches(&channel)) {
                         component.component.message_received(poll, &channel, &inner_message.data)
