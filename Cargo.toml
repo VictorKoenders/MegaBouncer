@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "server",
+    "irc_connector",
+    "tcp_connector",
+    "datastore"
+]
