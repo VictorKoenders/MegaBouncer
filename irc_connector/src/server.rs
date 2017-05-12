@@ -3,6 +3,7 @@ use shared::prelude::{ComponentResponse, Value};
 use super::IrcChannel;
 use base64;
 
+#[derive(Debug)]
 pub struct IrcServer {
     pub host: String,
     pub port: u16,
@@ -41,7 +42,7 @@ impl IrcServer {
         if let Some(&Value::Array(ref arr)) = value.get("channels") {
             for channel in arr {
                 if let Some(channel) = IrcChannel::from_json(channel) {
-                    channels.push(channel);
+                   channels.push(channel);
                 }
             }
         }
@@ -54,6 +55,10 @@ impl IrcServer {
             channels: channels,
             buffer: String::new(),
         })
+    }
+
+    pub fn to_json(&self) -> Value {
+        Value::Null
     }
 
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
@@ -86,5 +91,17 @@ impl IrcServer {
             map.insert(String::from("port"), Value::Number(self.port.into()));
             map.insert(String::from("data"), Value::String(base64::encode(str.to_string().as_bytes())));
         }))
+    }
+
+    pub fn merge_from(&mut self, other: IrcServer, _response: &mut Vec<ComponentResponse>) {
+        println!("Merging {:?} into {:?}", other, self);
+    }
+
+    pub fn connect(&mut self, _response: &mut Vec<ComponentResponse>) {
+        println!("Connecting {:?}", self);
+    }
+
+    pub fn disconnect(&mut self, _response: &mut Vec<ComponentResponse>) {
+        println!("Disconnecting {:?}", self);
     }
 }

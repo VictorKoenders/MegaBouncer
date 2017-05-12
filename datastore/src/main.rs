@@ -59,7 +59,7 @@ impl Component for RedisConnector {
                 Value::String(result)
             };
             vec![ComponentResponse::Send(message)]
-        } else {
+        } else if channel == "data.set" {
             let key = match message.as_object().map(|o| o.get("key")) {
                 Some(Some(&Value::String(ref str))) => str,
                 _ => {

@@ -1,4 +1,6 @@
 use shared::Value;
+
+#[derive(Debug)]
 pub struct IrcChannel {
     pub name: String
 }

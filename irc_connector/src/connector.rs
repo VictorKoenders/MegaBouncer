@@ -97,6 +97,37 @@ impl IrcConnector {
             _ => println!("Unknown type {:?}: {:?}", message_type, message)
         };
     }
+
+    // fn reset_config(&mut self, response: &mut Vec<ComponentResponse>){
+    //     response.push(ComponentResponse::Send(Message::new_emit("data.set", |mut map| {
+    //         map.insert(String::from("key"), Value::String(String::from("irc.config")));
+    //         map.insert(String::from("value"), Value::Array(self.servers.iter().map(|s| s.to_json()).collect::<Vec<_>>()));
+    //     })))
+    // }
+
+    fn update_config(&mut self, json: &Value, response: &mut Vec<ComponentResponse>){
+        let servers = IrcServer::from_json_array(json);
+        println!("Servers from config: {:?}", servers);
+        
+
+        let indices: Vec<usize> = self.servers.iter().enumerate().filter(|&(_, s)|
+            servers.iter().all(|s2| s2.host != s.host)
+        ).map(|(index, _)| index).collect::<Vec<_>>();
+
+        for index in indices.into_iter().rev() {
+            let mut server = self.servers.remove(index);
+            server.disconnect(response);
+        }
+
+        for mut server in servers {
+            if let Some(ref mut old_server) = self.servers.iter_mut().find(|s| s.host == server.host) {
+                old_server.merge_from(server, response);
+                continue;
+            } 
+            server.connect(response);
+            self.servers.push(server);
+        }
+    }
 }
 
 impl Component for IrcConnector {
@@ -119,17 +150,6 @@ impl Component for IrcConnector {
         vec
     }
 
-    // fn reply_received(&mut self, _poll: &Poll, _uuid: Uuid, channel: &Option<Channel>, message: &Value) -> Vec<ComponentResponse> {
-    //     let key = match message.as_object().and_then(|o| o.get("key")) {
-    //         Some(&Value::String(ref key)) if key == "irc.config" => { println!("IRC Config!"); key },
-    //         Some(&Value::String(ref key)) => { println!("Unknown key: {:?}", key); key },
-    //         Some(x) => { println!("Unknown reply: {:?}", x); return Vec::new(); },
-    //         None => { println!("Reply has no key: {:?}", message); return Vec::new(); }
-    //     };
-    //     println!("Got reply: {:?} {:?} {:?}", channel, key, message);
-    //     Vec::new()
-    // }
-
     fn message_received(&mut self, _poll: &Poll, channel: &Channel, message: &Value) -> Vec<ComponentResponse>{
         let mut response = Vec::new();
         if channel == "tcp.data" {
@@ -148,6 +168,8 @@ impl Component for IrcConnector {
                     println!("Could not find message data: {:?}", message);
                 }
             };
+        } else if channel == "data.irc.config" {
+            self.update_config(message, &mut response);
         } else if channel == "irc.send" {
             self.send_message(message, &mut response);
         } else {
