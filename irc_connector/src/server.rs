@@ -1,6 +1,6 @@
+use message::Message;
 use shared::prelude::{ComponentResponse, Value};
 use super::IrcChannel;
-use message::Message;
 use base64;
 
 pub struct IrcServer {
@@ -13,15 +13,47 @@ pub struct IrcServer {
 }
 
 impl IrcServer {
-    pub fn from_json(value: &Value) -> Vec<IrcServer> {
-        let _arr = match *value {
+    pub fn from_json_array(value: &Value) -> Vec<IrcServer> {
+        let arr = match *value {
             Value::Array(ref arr) => arr,
             _ => return Vec::new()
         };
 
-        // TODO: Implement
+        let mut result = Vec::new();
 
-        Vec::new()
+        for item in arr {
+            if let Some(server) = IrcServer::from_json(item) {
+                result.push(server);
+            }
+        }
+
+        result
+    }
+
+    fn from_json(value: &Value) -> Option<IrcServer> {
+        let host: String = match value.get("host").and_then(Value::as_str) { Some(s) => s.to_string(), None => return None };
+        let port: u16 = value.get("port").and_then(Value::as_u64).unwrap_or_else(||6667) as u16;
+        let nick: String = match value.get("nick").and_then(Value::as_str) { Some(s) => s.to_string(), None => return None };
+        let password: Option<String> = value.get("password").and_then(Value::as_str).map(String::from);
+
+        let mut channels = Vec::new();
+
+        if let Some(&Value::Array(ref arr)) = value.get("channels") {
+            for channel in arr {
+                if let Some(channel) = IrcChannel::from_json(channel) {
+                    channels.push(channel);
+                }
+            }
+        }
+        
+        Some(IrcServer {
+            host: host,
+            port: port,
+            nick: nick,
+            password: password,
+            channels: channels,
+            buffer: String::new(),
+        })
     }
 
     fn handle_message(&mut self, message: Message, response: &mut Vec<ComponentResponse>) {
