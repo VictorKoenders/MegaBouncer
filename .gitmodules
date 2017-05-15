@@ -1,24 +1,15 @@
-[submodule "Server"]
-	path = Server
-	url = https://github.com/MegaBouncer/Server
-
+[submodule "server"]
+	path = server
+	url = http://github.com/megabouncer/server
 [submodule "IrcConnector"]
-	path = irc_connector
-	url = https://github.com/MegaBouncer/IrcConnector
-
+	path = IrcConnector
+	url = http://github.com/megabouncer/IrcConnector
 [submodule "TcpConnector"]
-	path = tcp_connector
-	url = https://github.com/MegaBouncer/TcpConnector
-
+	path = TcpConnector
+	url = http://github.com/megabouncer/TcpConnector
 [submodule "DataStore"]
-	path = datastore
-	url = https://github.com/MegaBouncer/DataStore
-
-[submodule "ElectronClient"]
-	path = electron_client
-	url = https://github.com/MegaBouncer/ElectronClient
-
-[submodule "Shared"]
+	path = DataStore
+	url = http://github.com/megabouncer/DataStore
+[submodule "libs/shared"]
 	path = libs/shared
-	url = https://github.com/MegaBouncer/RustShared
-    
+	url = http://github.com/megabouncer/RustShared
