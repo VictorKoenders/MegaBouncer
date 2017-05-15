@@ -1,6 +1,6 @@
-[submodule "server"]
-	path = server
-	url = http://github.com/megabouncer/server
+[submodule "Server"]
+	path = Server
+	url = http://github.com/megabouncer/Server
 [submodule "IrcConnector"]
 	path = IrcConnector
 	url = http://github.com/megabouncer/IrcConnector
