@@ -1,8 +1,0 @@
-[workspace]
-members = [
-    "server",
-    "irc_connector",
-    "tcp_connector",
-    "datastore",
-    "test_client"
-]

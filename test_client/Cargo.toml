@@ -1,8 +1,0 @@
-[package]
-name = "test_client"
-version = "0.1.0"
-authors = ["victor.koenders <victor.koenders@gmail.com>"]
-
-[dependencies]
-shared = {path = "../libs/shared" }
-mio = "*"
