@@ -1,6 +1,9 @@
 [submodule "IrcConnector"]
 	path = IrcConnector
 	url = http://github.com/megabouncer/IrcConnector
+[submodule "prometheus_scraper"]
+	path = prometheus_scraper
+	url = https://github.com/MegaBouncer/prometheus_scraper
 [submodule "TcpConnector"]
 	path = TcpConnector
 	url = http://github.com/megabouncer/TcpConnector
