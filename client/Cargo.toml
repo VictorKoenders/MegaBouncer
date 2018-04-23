@@ -1,0 +1,8 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["Victor Koenders <victor.koenders@gmail.com>"]
+
+[dependencies]
+web-view = { git = "https://github.com/Boscop/web-view", rev = "d416fa4bce75f0203734fc948cbd3db999c52e0c" }
+urlencoding = "*"
