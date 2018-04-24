@@ -1,9 +1,9 @@
 use mio::*;
 use serde_json::{self, Value};
-use std::error::Error;
-use std::io::Read;
 use std::collections::vec_deque::VecDeque;
+use std::error::Error;
 use std::fmt;
+use std::io::Read;
 
 pub struct Reader {
     stream: net::TcpStream,
@@ -55,7 +55,10 @@ impl Reader {
             };
             self.buffer.extend(&bytes[..length]);
             while let Some(index) = self.buffer.iter().position(|c| *c == b'\n') {
-                let drained = self.buffer.drain(..index + 1).take(index).collect::<Vec<_>>();
+                let drained = self.buffer
+                    .drain(..index + 1)
+                    .take(index)
+                    .collect::<Vec<_>>();
                 let value: Value = match serde_json::from_slice(&drained) {
                     Ok(v) => v,
                     Err(e) => return Err(format!("Could not parse JSON: {:?}", e)),
@@ -66,9 +69,13 @@ impl Reader {
         }
         if cfg!(debug) {
             if self.buffer.capacity() > BUFFER_LENGTH {
-                println!("Buffer is larger than expectd! {} > {}", self.buffer.capacity(), BUFFER_LENGTH);
+                println!(
+                    "Buffer is larger than expectd! {} > {}",
+                    self.buffer.capacity(),
+                    BUFFER_LENGTH
+                );
             }
-            if self.buffer.len() > 0 {
+            if !self.buffer.is_empty() {
                 println!("Buffer is not empty after finishing Reader::read");
             }
         }

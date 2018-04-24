@@ -3,14 +3,15 @@ extern crate uuid;
 
 mod client;
 
-use shared::mio::{Poll, Token, Ready, PollOpt, Events};
 use shared::mio::net::TcpListener;
+use shared::mio::{Events, Poll, PollOpt, Ready, Token};
 
 fn main() {
     let poll = Poll::new().unwrap();
     let addr = "127.0.0.1:13265".parse().unwrap();
     let listener = TcpListener::bind(&addr).unwrap();
-    poll.register(&listener, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+    poll.register(&listener, Token(0), Ready::readable(), PollOpt::edge())
+        .unwrap();
     let mut events = Events::with_capacity(100);
     let mut clients = Vec::new();
     let mut token_iterator = (1..).map(Token);
@@ -24,7 +25,8 @@ fn main() {
                         panic!("Could not receive connections: {:?}", e);
                     }
                 };
-                let new_client = client::Client::new(stream, addr, &poll, token_iterator.next().unwrap());
+                let new_client =
+                    client::Client::new(stream, addr, &poll, token_iterator.next().unwrap());
                 clients.push(new_client);
             } else if let Some(index) = clients.iter().position(|c| c.is(event.token())) {
                 let value = match clients[index].update(event.readiness()) {
@@ -37,7 +39,6 @@ fn main() {
                     }
                 };
                 println!("{:?} {:?} {:?}", clients[index], event, value);
-                
             }
         }
     }

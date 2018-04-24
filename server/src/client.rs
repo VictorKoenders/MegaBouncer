@@ -1,10 +1,10 @@
-use shared::Reader;
 use shared::mio::net::TcpStream;
-use std::net::SocketAddr;
-use shared::mio::{Poll, Token, Ready};
-use shared::serde_json::Value;
-use std::fmt;
+use shared::mio::{Poll, Ready, Token};
 use shared::semver::Version;
+use shared::serde_json::Value;
+use shared::Reader;
+use std::fmt;
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 pub struct Client {
@@ -12,7 +12,7 @@ pub struct Client {
     reader: Reader,
     id: Uuid,
     name: Option<String>,
-    version: Option<Version>
+    version: Option<Version>,
 }
 
 impl fmt::Debug for Client {
@@ -24,14 +24,11 @@ impl fmt::Debug for Client {
         if let Some(ref version) = self.version {
             res.field("version", &version);
         }
-        res
-            .field("id", &self.id.to_string())
+        res.field("id", &self.id.to_string())
             .field("addr", &self.addr.to_string())
             .finish()
-            
     }
 }
-
 
 impl Client {
     pub fn new(stream: TcpStream, addr: SocketAddr, poll: &Poll, token: Token) -> Client {
