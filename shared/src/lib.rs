@@ -1,7 +1,6 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub extern crate mio;
+extern crate serde_json;
+
+mod reader;
+
+pub use reader::*;

@@ -3,51 +3,69 @@
 
 extern crate web_view;
 
-use std::thread::{spawn, sleep_ms};
-use std::sync::{Arc, Mutex};
+use std::thread::{sleep_ms, spawn};
 use web_view::*;
 
-fn main() {
-	let size = (800, 600);
-	let resizable = true;
-	let debug = true;
-	let initial_userdata = 0;
-	let counter = Arc::new(Mutex::new(0));
-	let counter_inner = counter.clone();
-	run("timer example", Content::Html(HTML), Some(size), resizable, debug, move |webview| {
-		spawn(move || {
-			loop {
-				{
-					let mut counter = counter_inner.lock().unwrap();
-					*counter += 1;
-					webview.dispatch(|webview, userdata| {
-						*userdata -= 1;
-						render(webview, *counter, *userdata);
-					});
-				}
-				sleep_ms(1000);
-			}
-		});
-	}, move |webview, arg, userdata| {
-		match arg {
-			"reset" => {
-				*userdata += 10;
-				let mut counter = counter.lock().unwrap();
-				*counter = 0;
-				render(webview, *counter, *userdata);
-			}
-			"exit" => {
-				webview.terminate();
-			}
-			_ => unimplemented!()
-		}
-	}, initial_userdata);
-	println!("Done!");
+#[derive(Default, Debug)]
+struct UserState {
+	pub counter: i32,
 }
 
-fn render<'a, T>(webview: &mut WebView<'a, T>, counter: u32, userdata: i32) {
-	println!("counter: {}, userdata: {}", counter, userdata);
-	webview.eval(&format!("updateTicks({}, {})", counter, userdata));
+fn main() {
+    let (result_userdata, success) = run(
+        "Megabouncer",
+        Content::Html(HTML),
+        Some((800, 600)),
+        true,
+        true,
+        init_cb,
+        invoke_cb,
+		Default::default(),
+    );
+    println!("Success? {:?}", success);
+    println!("Last user data: {:?}", result_userdata);
+}
+
+fn init_cb(webview: MyUnique<WebView<'static, UserState>>) {
+    spawn(move || loop {
+        {
+            webview.dispatch(|webview, userdata| {
+                userdata.counter -= 1;
+                render(webview, userdata);
+            });
+        }
+        sleep_ms(1000);
+    });
+}
+
+fn invoke_cb(webview: &mut WebView<UserState>, arg: &str, userdata: &mut UserState) {
+    match arg {
+        "reset" => {
+            userdata.counter += 10;
+            render(webview, userdata);
+        }
+        "exit" => {
+            webview.terminate();
+        }
+		x if x.starts_with("keydown:") => {
+			let code = x.split(':').nth(1);
+			if let Some(Ok(code)) = code.map(|c| c.parse::<i32>()) {
+				println!("Key code {:?}", code);
+				if code == 27 {
+					webview.terminate();
+				}
+			}
+		}
+		x if x.starts_with("log:") => {
+			let line = x.split(':').skip(1).collect::<Vec<_>>().join(", ");
+			println!("{}", line);
+		}
+        _ => unimplemented!(),
+    }
+}
+
+fn render(webview: &mut WebView<UserState>, userdata: &UserState) {
+    webview.eval(&format!("updateTicks({})", userdata.counter));
 }
 
 const HTML: &'static str = r#"
@@ -58,8 +76,18 @@ const HTML: &'static str = r#"
 		<button onclick="external.invoke('reset')">reset</button>
 		<button onclick="external.invoke('exit')">exit</button>
 		<script type="text/javascript">
-			function updateTicks(n, u) {
-				document.getElementById('ticks').innerHTML = 'ticks ' + n + '<br>' + 'userdata ' + u;
+			function updateTicks(u) {
+				document.getElementById('ticks').innerHTML = 'userdata ' + u;
+			}
+			console.log = function(){
+				var args = "log:";
+				for(var i = 0; i < arguments.length; i++) {
+					args += arguments[i];
+				}
+				external.invoke(args);
+			}
+			document.onkeydown = function(e){
+				external.invoke("keydown:" + e.keyCode);
 			}
 		</script>
 	</body>
