@@ -61,7 +61,6 @@ impl Reader {
                     Err(e) => return Err(format!("Could not parse JSON: {:?}", e)),
                 };
 
-                println!("{:#?}", value);
                 result.push(value);
             }
         }

@@ -6,3 +6,4 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 [dependencies]
 mio = "*"
 serde_json = "*"
+semver = "*"

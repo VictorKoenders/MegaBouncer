@@ -135,6 +135,29 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rand"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "semver"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "semver-parser"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "serde"
 version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,6 +177,7 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "shared 0.1.0",
+ "uuid 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -161,6 +185,7 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "mio 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -173,6 +198,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "urlencoding"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "uuid"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.43 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "web-view"
@@ -250,10 +285,14 @@ dependencies = [
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum net2 0.2.32 (registry+https://github.com/rust-lang/crates.io-index)" = "9044faf1413a1057267be51b5afba8eb1090bd2231c693664aa1db716fe1eae0"
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
+"checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
+"checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
+"checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum serde 1.0.43 (registry+https://github.com/rust-lang/crates.io-index)" = "0c855d888276f20d140223bd06515e5bf1647fd6d02593cb5792466d9a8ec2d0"
 "checksum serde_json 1.0.16 (registry+https://github.com/rust-lang/crates.io-index)" = "8c6c4e049dc657a99e394bd85c22acbf97356feeec6dbf44150f2dcf79fb3118"
 "checksum slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fdeff4cd9ecff59ec7e3744cbca73dfe5ac35c2aedb2cfba8a1c715a18912e9d"
 "checksum urlencoding 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3df3561629a8bb4c57e5a2e4c43348d9e29c7c29d9b1c4c1f47166deca8f37ed"
+"checksum uuid 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8630752f979f1b6b87c49830a5e3784082545de63920d59fbaac252474319447"
 "checksum web-view 0.1.3 (git+https://github.com/Boscop/web-view?rev=d416fa4bce75f0203734fc948cbd3db999c52e0c)" = "<none>"
 "checksum webview-sys 0.1.0 (git+https://github.com/Boscop/web-view?rev=d416fa4bce75f0203734fc948cbd3db999c52e0c)" = "<none>"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
