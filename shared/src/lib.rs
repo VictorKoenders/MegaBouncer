@@ -1,5 +1,5 @@
 pub extern crate mio;
-extern crate serde_json;
+pub extern crate serde_json;
 
 mod reader;
 
