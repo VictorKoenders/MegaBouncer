@@ -8,7 +8,7 @@ use web_view::*;
 
 #[derive(Default, Debug)]
 struct UserState {
-	pub counter: i32,
+    pub counter: i32,
 }
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
         true,
         init_cb,
         invoke_cb,
-		Default::default(),
+        Default::default(),
     );
     println!("Success? {:?}", success);
     println!("Last user data: {:?}", result_userdata);
@@ -39,27 +39,27 @@ fn init_cb(webview: MyUnique<WebView<'static, UserState>>) {
 }
 
 fn invoke_cb(webview: &mut WebView<UserState>, arg: &str, userdata: &mut UserState) {
-    match arg {
-        "reset" => {
+    let mut iter = arg.split(':');
+    match iter.next() {
+        Some("reset") => {
             userdata.counter += 10;
             render(webview, userdata);
         }
-        "exit" => {
+        Some("exit") => {
             webview.terminate();
         }
-		x if x.starts_with("keydown:") => {
-			let code = x.split(':').nth(1);
-			if let Some(Ok(code)) = code.map(|c| c.parse::<i32>()) {
-				println!("Key code {:?}", code);
-				if code == 27 {
-					webview.terminate();
-				}
-			}
-		}
-		x if x.starts_with("log:") => {
-			let line = x.split(':').skip(1).collect::<Vec<_>>().join(", ");
-			println!("{}", line);
-		}
+        Some("keydown") => {
+            if let Some(Ok(code)) = iter.next().map(|c| c.parse::<i32>()) {
+                println!("Key code {:?}", code);
+                if code == 27 {
+                    webview.terminate();
+                }
+            }
+        }
+        Some("log") => {
+            let line = iter.collect::<Vec<_>>().join(", ");
+            println!("{}", line);
+        }
         _ => unimplemented!(),
     }
 }
@@ -68,7 +68,7 @@ fn render(webview: &mut WebView<UserState>, userdata: &UserState) {
     webview.eval(&format!("updateTicks({})", userdata.counter));
 }
 
-const HTML: &'static str = r#"
+const HTML: &str = r#"
 <!doctype html>
 <html>
 	<body>
