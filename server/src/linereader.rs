@@ -1,5 +1,4 @@
-use futures::Poll;
-use futures::Stream;
+use futures::{Poll, Stream};
 use std::{io, ptr, str};
 use tokio_io::AsyncRead;
 

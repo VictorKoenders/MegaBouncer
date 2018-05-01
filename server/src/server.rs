@@ -36,7 +36,6 @@ impl ServerState {
             println!("Could not broadcast {:?}", message);
             return;
         };
-        println!("Broadcasting {:?}", message);
         for client in self.clients.values_mut() {
             if client.is_listening_to(action) {
                 client.send(message);
@@ -58,10 +57,7 @@ impl ServerState {
                         .filter_map(|c| {
                             let mut map = Map::new();
                             map.insert(String::from("id"), Value::String(c.id.to_string()));
-                            map.insert(
-                                String::from("name"),
-                                Value::String(c.name.clone()?),
-                            );
+                            map.insert(String::from("name"), Value::String(c.name.clone()?));
                             map.insert(
                                 String::from("channels"),
                                 Value::Array(
@@ -75,6 +71,94 @@ impl ServerState {
             );
             map
         })
+    }
+}
+
+fn node_identify(addr: &SocketAddr, state: &mut ServerState, message: &Value) {
+    match message
+        .as_object()
+        .and_then(|o| o.get("name"))
+        .and_then(|s| s.as_str())
+    {
+        Some(s) if !s.trim().is_empty() => {
+            let mut uuid = None;
+            if let Some(ref mut client) = state.clients.get_mut(&addr) {
+                client.name = Some(s.to_string());
+                uuid = Some(client.id);
+            }
+            if let Some(uuid) = uuid {
+                state.broadcast(&make_client_joined(s, &uuid));
+            }
+        }
+        _ => {
+            if let Some(ref mut client) = state.clients.get_mut(&addr) {
+                client.send(&make_error("Missing required field 'name'"));
+            }
+        }
+    }
+}
+
+fn node_register(addr: &SocketAddr, state: &mut ServerState, message: &Value) {
+    match message
+        .as_object()
+        .and_then(|o| o.get("channel"))
+        .and_then(|s| s.as_str())
+    {
+        Some(s) if !s.trim().is_empty() => {
+            let mut uuid = None;
+            let mut name = None;
+            if let Some(ref mut client) = state.clients.get_mut(&addr) {
+                if client.name.is_none() {
+                    client.send(&make_error("Not identified"));
+                } else {
+                    client.listening_to.push(s.to_string());
+                    uuid = Some(client.id);
+                    name = client.name.clone();
+                }
+            }
+            if let Some(uuid) = uuid {
+                if let Some(name) = name {
+                    state.broadcast(&make_client_listening_to(&name, s, &uuid));
+                }
+            }
+        }
+        _ => {
+            if let Some(ref mut client) = state.clients.get_mut(&addr) {
+                client.send(&make_error("Missing required field 'channel'"));
+            }
+        }
+    }
+}
+
+fn node_list(addr: &SocketAddr, state: &mut ServerState) {
+    let list = state.get_list();
+    if let Some(ref mut client) = state.clients.get_mut(addr) {
+        if client.name.is_some() {
+            client.send(&list);
+        } else {
+            client.send(&make_error("Not identified"));
+        }
+    }
+}
+fn node_broadcast(addr: &SocketAddr, state: &mut ServerState, message: Value) {
+    let mut valid = false;
+    let mut message = message;
+    if let Some(ref mut client) = state.clients.get_mut(addr) {
+        if client.name.is_some() {
+            if let Some(ref mut o) = message.as_object_mut() {
+                o.insert(
+                    String::from("name"),
+                    Value::String(client.name.clone().unwrap()),
+                );
+                o.insert(String::from("id"), Value::String(client.id.to_string()));
+                valid = true;
+            }
+        } else {
+            client.send(&make_error("Not identified"));
+        }
+    }
+    if valid {
+        state.broadcast(&message);
     }
 }
 
@@ -107,93 +191,10 @@ impl Server {
                     .and_then(|o| o.get("action"))
                     .and_then(|s| s.as_str())
                 {
-                    Some("node.identify") => match message
-                        .as_object()
-                        .and_then(|o| o.get("name"))
-                        .and_then(|s| s.as_str())
-                    {
-                        Some(s) if !s.trim().is_empty() => {
-                            let mut uuid = None;
-                            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                                client.name = Some(s.to_string());
-                                uuid = Some(client.id);
-                            }
-                            if let Some(uuid) = uuid {
-                                state.broadcast(&make_client_joined(s, &uuid));
-                            }
-                        }
-                        _ => {
-                            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                                client.send(&make_error("Missing required field 'name'"));
-                            }
-                        }
-                    },
-                    Some("node.listener.register") => match message
-                        .as_object()
-                        .and_then(|o| o.get("channel"))
-                        .and_then(|s| s.as_str())
-                    {
-                        Some(s) if !s.trim().is_empty() => {
-                            let mut uuid = None;
-                            let mut name = None;
-                            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                                if client.name.is_none() {
-                                    client.send(&make_error("Not identified"));
-                                } else {
-                                    client.listening_to.push(s.to_string());
-                                    uuid = Some(client.id);
-                                    name = client.name.clone();
-                                }
-                            }
-                            if let Some(uuid) = uuid {
-                                if let Some(name) = name {
-                                    state.broadcast(&make_client_listening_to(&name, s, &uuid));
-                                }
-                            }
-                        }
-                        _ => {
-                            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                                client.send(&make_error("Missing required field 'channel'"));
-                            }
-                        }
-                    },
-                    Some("node.listener.remove") => {
-                        println!("Removing listner {:?}", message);
-                    }
-                    Some("node.list") => {
-                        let list = state.get_list();
-                        if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                            if client.name.is_some() {
-                                client.send(&list);
-                            } else {
-                                client.send(&make_error("Not identified"));
-                            }
-                        }
-                    }
-                    Some(_) => {
-                        let mut valid = false;
-                        let mut message = message;
-                        if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                            if client.name.is_some() {
-                                if let Some(ref mut o) = message.as_object_mut() {
-                                    o.insert(
-                                        String::from("name"),
-                                        Value::String(client.name.clone().unwrap()),
-                                    );
-                                    o.insert(
-                                        String::from("id"),
-                                        Value::String(client.id.to_string()),
-                                    );
-                                    valid = true;
-                                }
-                            } else {
-                                client.send(&make_error("Not identified"));
-                            }
-                        }
-                        if valid {
-                            state.broadcast(&message);
-                        }
-                    }
+                    Some("node.identify") => node_identify(&addr, &mut state, &message),
+                    Some("node.listener.register") => node_register(&addr, &mut state, &message),
+                    Some("node.list") => node_list(&addr, &mut state),
+                    Some(_) => node_broadcast(&addr, &mut state, message),
                     None => {
                         if let Some(ref mut client) = state.clients.get_mut(&addr) {
                             client.send(&make_error("Missing required field 'action'"));
