@@ -16,6 +16,7 @@ impl ServerHandle {
         ServerHandle { sender }
     }
 
+    /// Send a "ClientConnected" message to the central server
     pub fn client_connected(
         &mut self,
         address: SocketAddr,
@@ -31,6 +32,8 @@ impl ServerHandle {
                 .map(|_| {}),
         )
     }
+
+    /// Send a "ClientDisconnected" message to the central server
     pub fn client_disconnected(&mut self, address: SocketAddr) -> ::EmptyFuture {
         Box::new(
             self.sender
@@ -42,6 +45,7 @@ impl ServerHandle {
                 .map(|_| {}),
         )
     }
+    /// Send a "Message" message to the central server
     pub fn message_received(&mut self, address: SocketAddr, value: Value) -> ::EmptyFuture {
         Box::new(
             self.sender

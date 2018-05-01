@@ -2,13 +2,18 @@ use futures::{Poll, Stream};
 use std::{io, ptr, str};
 use tokio_io::AsyncRead;
 
+/// Contains a wrapper over a reader that will split the data in lines
 pub struct LineReader<R> {
+    /// The reader
     reader: R,
+    /// The position of the current buffer
     buffer_position: usize,
+    /// The current buffer
     buffer: [u8; 1024],
 }
 
 impl<R> LineReader<R> {
+    /// Create a new LineReader over a given reader
     pub fn new(reader: R) -> LineReader<R> {
         LineReader {
             reader,
