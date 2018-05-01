@@ -20,7 +20,7 @@ impl ServerHandle {
         &mut self,
         address: SocketAddr,
         writer: WriteHalf<TcpStream>,
-    ) -> Box<Future<Item = (), Error = ()> + Send> {
+    ) -> ::EmptyFuture {
         Box::new(
             self.sender
                 .clone()
@@ -31,11 +31,18 @@ impl ServerHandle {
                 .map(|_| {}),
         )
     }
-    pub fn message_received(
-        &mut self,
-        address: SocketAddr,
-        value: Value,
-    ) -> Box<Future<Item = (), Error = ()> + Send> {
+    pub fn client_disconnected(&mut self, address: SocketAddr) -> ::EmptyFuture {
+        Box::new(
+            self.sender
+                .clone()
+                .send(ServerMessage::ClientDisconnected(address))
+                .map_err(|e| {
+                    println!("Could not send error to server: {:?}", e);
+                })
+                .map(|_| {}),
+        )
+    }
+    pub fn message_received(&mut self, address: SocketAddr, value: Value) -> ::EmptyFuture {
         Box::new(
             self.sender
                 .clone()
