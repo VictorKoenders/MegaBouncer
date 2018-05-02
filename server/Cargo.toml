@@ -5,7 +5,4 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
 shared = { path = "../shared" }
-tokio = "0.1.5"
-tokio-io = "0.1.6"
-futures = "0.1.20"
 uuid = { version = "0.6.3", features = ["v4"] }

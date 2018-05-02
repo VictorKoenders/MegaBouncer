@@ -1,12 +1,14 @@
 use client::Client;
-use futures::sync::mpsc::{channel, Receiver};
-use futures::Stream;
 use serde_json::{Map, Value};
 use serverhandle::ServerHandle;
+use shared::futures::sync::mpsc::{channel, Receiver};
+use shared::futures::Stream;
+use shared::tokio::net::TcpStream;
+use shared::tokio_io::io::WriteHalf;
+use shared::EmptyFuture;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use tokio::net::TcpStream;
-use tokio_io::io::WriteHalf;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 /// The different messages that each client can emit to the central server
@@ -178,12 +180,28 @@ fn node_broadcast(addr: &SocketAddr, state: &mut ServerState, message: Value) {
             client.send(&make_error("Not identified"));
         }
     }
+    if let Some(to) = if let Some(obj) = message.as_object_mut() {
+        obj.remove("to")
+            .and_then(|to| to.as_str().map(|s| s.to_string()))
+    } else {
+        None
+    } {
+        if let Some(ref mut client) = state.clients.values_mut().find(|c| c.id.to_string() == to) {
+            client.send(&message);
+            return;
+        }
+        if let Some(ref mut sender) = state.clients.get_mut(addr) {
+            sender.send(&make_error(&format!("Client '{}' not found", to)));
+        }
+        return;
+    }
     if valid {
         state.broadcast(&message);
     }
 }
 
 impl Server {
+    /// Create a new server handle and server
     pub fn new() -> (ServerHandle, Server) {
         let (sender, receiver) = channel(10);
 
@@ -192,9 +210,7 @@ impl Server {
 
     /// Start the server
     /// This will wait for messages from clients and handle them appropriately
-    pub fn start(self) -> ::EmptyFuture {
-        use std::sync::Arc;
-        use std::sync::Mutex;
+    pub fn start(self) -> EmptyFuture {
         let state = Arc::new(Mutex::new(ServerState::default()));
         Box::new(self.receiver.for_each(move |message| {
             let mut state = state.lock().unwrap();
@@ -203,8 +219,11 @@ impl Server {
                     state.clients.insert(addr, Client::new(addr, write));
                 }
                 ServerMessage::ClientDisconnected(addr) => {
+                    println!("Client disconnected");
                     if let Some(mut c) = state.clients.remove(&addr) {
+                        println!("Client removed");
                         if let Some(name) = c.name.take() {
+                            println!("Client disconnect broadcasted");
                             state.broadcast(&make_client_disconnected(&name, &c.id));
                         }
                     }

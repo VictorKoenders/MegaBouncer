@@ -1,17 +1,20 @@
-use futures::sync::mpsc::Sender;
-use futures::{Future, Sink};
 use serde_json::Value;
 use server::ServerMessage;
+use shared::futures::sync::mpsc::Sender;
+use shared::futures::{Future, Sink};
+use shared::tokio::net::TcpStream;
+use shared::tokio_io::io::WriteHalf;
+use shared::EmptyFuture;
 use std::net::SocketAddr;
-use tokio::net::TcpStream;
-use tokio_io::io::WriteHalf;
 
+/// A lightweight handle that allows futures to send messages to the central server
 #[derive(Clone)]
 pub struct ServerHandle {
     sender: Sender<ServerMessage>,
 }
 
 impl ServerHandle {
+    /// Create a new server handle
     pub fn new(sender: Sender<ServerMessage>) -> ServerHandle {
         ServerHandle { sender }
     }
@@ -21,7 +24,7 @@ impl ServerHandle {
         &mut self,
         address: SocketAddr,
         writer: WriteHalf<TcpStream>,
-    ) -> ::EmptyFuture {
+    ) -> EmptyFuture {
         Box::new(
             self.sender
                 .clone()
@@ -34,7 +37,7 @@ impl ServerHandle {
     }
 
     /// Send a "ClientDisconnected" message to the central server
-    pub fn client_disconnected(&mut self, address: SocketAddr) -> ::EmptyFuture {
+    pub fn client_disconnected(&mut self, address: SocketAddr) -> EmptyFuture {
         Box::new(
             self.sender
                 .clone()
@@ -46,7 +49,7 @@ impl ServerHandle {
         )
     }
     /// Send a "Message" message to the central server
-    pub fn message_received(&mut self, address: SocketAddr, value: Value) -> ::EmptyFuture {
+    pub fn message_received(&mut self, address: SocketAddr, value: Value) -> EmptyFuture {
         Box::new(
             self.sender
                 .clone()
