@@ -38,6 +38,9 @@
 
 extern crate shared;
 extern crate uuid;
+extern crate mio;
+#[macro_use]
+extern crate error_chain;
 
 /// holds a reference to the clients connected to the server
 pub mod client;

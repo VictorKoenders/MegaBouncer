@@ -1,15 +1,9 @@
-pub extern crate tokio;
-pub extern crate tokio_io;
-#[macro_use]
-pub extern crate futures;
+pub extern crate mio;
 pub extern crate serde;
 pub extern crate serde_json;
 
 pub mod client;
 pub mod linereader;
-
-/// Short-hand type for a boxed empty future result
-pub type EmptyFuture = Box<futures::Future<Item = (), Error = ()> + Send>;
 
 /// Checks if the given channel matches any of the channels in the list
 /// Channels match if:

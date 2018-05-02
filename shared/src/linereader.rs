@@ -1,6 +1,5 @@
-use futures::{Poll, Stream};
-use std::{io, ptr, str};
-use tokio_io::AsyncRead;
+use std::{ptr, str};
+use std::io::{Error, ErrorKind, Read};
 
 /// Contains a wrapper over a reader that will split the data in lines
 pub struct LineReader<R> {
@@ -12,7 +11,7 @@ pub struct LineReader<R> {
     buffer: [u8; 1024],
 }
 
-impl<R> LineReader<R> {
+impl<R: Read> LineReader<R> {
     /// Create a new LineReader over a given reader
     pub fn new(reader: R) -> LineReader<R> {
         LineReader {
@@ -21,13 +20,8 @@ impl<R> LineReader<R> {
             buffer: [0u8; 1024],
         }
     }
-}
 
-impl<R: AsyncRead> Stream for LineReader<R> {
-    type Item = String;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+    pub fn read_line(&mut self) -> Result<Option<String>, Error> {
         loop {
             if let Some(index) = self.buffer[..self.buffer_position]
                 .iter()
@@ -45,19 +39,20 @@ impl<R: AsyncRead> Stream for LineReader<R> {
                     );
                 }
                 self.buffer_position -= index + 1;
-                return Ok(Some(str).into());
+                return Ok(Some(str));
             }
-            let n = try_ready!(
-                self.reader
-                    .poll_read(&mut self.buffer[self.buffer_position..])
-            );
-            if n == 0 {
-                return Ok(None.into());
-            }
+            let n = match self.reader.read(&mut self.buffer[self.buffer_position..]) {
+                Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    return Ok(None);
+                },
+                Err(e) => return Err(e),
+                Ok(0) => return Err(Error::from(ErrorKind::UnexpectedEof)),
+                Ok(n) => n
+            };
             self.buffer_position += n;
             if self.buffer_position == self.buffer.len() {
                 println!("Buffer overflowed");
-                return Ok(None.into());
+                return Err(Error::from(ErrorKind::InvalidData));
             }
         }
     }

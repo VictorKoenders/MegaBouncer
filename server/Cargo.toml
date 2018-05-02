@@ -6,3 +6,5 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 [dependencies]
 shared = { path = "../shared" }
 uuid = { version = "0.6.3", features = ["v4"] }
+mio = "*"
+error-chain = "*"
