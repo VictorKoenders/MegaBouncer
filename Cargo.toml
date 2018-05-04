@@ -3,5 +3,6 @@ members = [
 	"shared",
 	"server",
 	"client",
+	"test_tool",
 	"launcher"
 ]
