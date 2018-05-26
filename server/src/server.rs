@@ -33,6 +33,9 @@ impl Server {
         } else {
             return;
         }
+        if updates.iter().any(|u| u.is_disconnect()) {
+            self.clients.remove(&event.token());
+        }
         self.handle_updates(updates, event.token(), name, id);
     }
 

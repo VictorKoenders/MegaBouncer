@@ -44,7 +44,6 @@ impl Client {
     /// Send a given JSON message to a client
     /// This function is blocking
     pub fn send(&mut self, message: &Value) -> Result<()> {
-        println!("Writing {:?}", message);
         let bytes = to_vec(message).unwrap();
         self.write_buff.extend(bytes);
         self.write_buff.extend(&[b'\r', b'\n']);
@@ -64,11 +63,13 @@ impl Client {
                 Ok(n) => {
                     self.write_buff.drain(..n);
                     if self.write_buff.len() == 0 {
+                        self.is_writable = true;
                         return Ok(());
                     }
                     continue;
                 }
                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    self.is_writable = false;
                     Ok(())
                 }
                 Err(e) => Err(e)
@@ -172,7 +173,6 @@ impl Client {
                                 break 'outer;
                             }
                         };
-                        println!("Line: {:?}", line);
                         if let Some(update) = self.handle_line(line) {
                             updates.push(update);
                         }
@@ -200,8 +200,7 @@ impl Client {
     pub fn update(&mut self, event: Event) -> Vec<ClientUpdate> {
         if event.readiness().is_writable() {
             if let Err(e) = self.process_write() {
-                println!("Client {:?} error:", self.address);
-                println!("{:?}", e);
+                self.print_error(e);
                 return vec![
                     ClientUpdate::Disconnect
                 ];
@@ -245,4 +244,14 @@ pub enum ClientUpdate {
 
     /// This client has disconnected
     Disconnect,
+}
+
+impl ClientUpdate {
+    /// Checks if the current update enum is [ClientUpdate::Disconnect]
+    pub fn is_disconnect(&self) -> bool {
+        match self {
+            ClientUpdate::Disconnect => true,
+            _ => false
+        }
+    }
 }
