@@ -1,4 +1,5 @@
 pub extern crate mio;
+pub extern crate mio_poll_wrapper;
 pub extern crate serde;
 pub extern crate serde_json;
 

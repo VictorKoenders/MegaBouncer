@@ -1,5 +1,5 @@
-use std::{ptr, str};
 use std::io::{Error, ErrorKind, Read};
+use std::{ptr, str};
 
 /// Contains a wrapper over a reader that will split the data in lines
 pub struct LineReader<R> {
@@ -44,10 +44,10 @@ impl<R: Read> LineReader<R> {
             let n = match self.reader.read(&mut self.buffer[self.buffer_position..]) {
                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                     return Ok(None);
-                },
+                }
                 Err(e) => return Err(e),
                 Ok(0) => return Err(Error::from(ErrorKind::UnexpectedEof)),
-                Ok(n) => n
+                Ok(n) => n,
             };
             self.buffer_position += n;
             if self.buffer_position == self.buffer.len() {

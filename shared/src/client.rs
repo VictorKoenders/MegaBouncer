@@ -1,12 +1,13 @@
 use mio::net::TcpStream;
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::Token;
+use mio_poll_wrapper::{Handle, PollWrapper};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
-type Listener<TState> = fn(&mut TState, &str, &Value);
+type Listener<TState> = fn(&mut TState, &mut Handle, &str, &Value);
 
 pub struct Client<TState: Send> {
     state: ClientState<TState>,
@@ -28,8 +29,9 @@ struct ClientState<TState: Send> {
 }
 
 impl<TState: Send> ClientState<TState> {
-    fn json_received(&mut self, json: Value) {
-        let action = match json.as_object()
+    fn json_received(&mut self, json: &Value, handle: &mut Handle) {
+        let action = match json
+            .as_object()
             .and_then(|o| o.get("action"))
             .and_then(|a| a.as_str())
         {
@@ -48,7 +50,7 @@ impl<TState: Send> ClientState<TState> {
                 None
             }
         }) {
-            listener(&mut self.state, action, &json);
+            listener(&mut self.state, handle, action, &json);
         }
     }
 }
@@ -58,7 +60,7 @@ impl<TState: Send + 'static> Client<TState> {
         Client {
             state: ClientState {
                 name: name.into(),
-                state: state,
+                state,
                 listeners: HashMap::new(),
             },
             stream_state: None,
@@ -80,9 +82,9 @@ impl<TState: Send + 'static> Client<TState> {
     }
 
     fn write<T: Serialize>(&mut self, t: &T) -> Result<(), String> {
-        let mut buff = ::serde_json::to_vec(t)
+        let buff = ::serde_json::to_vec(t)
             .map_err(|e| format!("Could not convert object to json string: {:?}", e))?;
-        self.write_buffer.extend_from_slice(&mut buff);
+        self.write_buffer.extend_from_slice(&buff);
         self.write_buffer.extend_from_slice(b"\r\n");
         if let Some(true) = self.stream_state.as_ref().map(|s| s.is_writable) {
             self.process_write_buffer()
@@ -92,7 +94,8 @@ impl<TState: Send + 'static> Client<TState> {
     }
 
     fn process_write_buffer(&mut self) -> Result<(), String> {
-        match self.stream_state
+        match self
+            .stream_state
             .as_mut()
             .unwrap()
             .stream
@@ -100,14 +103,14 @@ impl<TState: Send + 'static> Client<TState> {
         {
             Ok(n) => {
                 self.write_buffer.drain(..n);
-                self.stream_state.as_mut().unwrap().is_writable = self.write_buffer.len() == 0;
+                self.stream_state.as_mut().unwrap().is_writable = self.write_buffer.is_empty();
                 Ok(())
             }
             Err(e) => Err(format!("Could not write to stream: {:?}", e)),
         }
     }
 
-    fn try_process_line(&mut self) -> Result<(), String> {
+    fn try_process_line(&mut self, handle: &mut Handle) -> Result<(), String> {
         let stream_state = self.stream_state.as_mut().unwrap();
         while let Some(position) = stream_state.read_buffer.iter().position(|c| *c == b'\n') {
             {
@@ -115,8 +118,8 @@ impl<TState: Send + 'static> Client<TState> {
                     .map_err(|e| format!("Could not read a valid utf8-string: {:?}", e))?
                     .trim();
                 match ::serde_json::from_str(line) {
-                    Ok(v) => self.state.json_received(v),
-                    Err(e) => return Err(format!("Could not parse json: {:?}", e))
+                    Ok(v) => self.state.json_received(&v, handle),
+                    Err(e) => return Err(format!("Could not parse json: {:?}", e)),
                 }
             }
             stream_state.read_buffer.drain(..position + 1);
@@ -126,7 +129,6 @@ impl<TState: Send + 'static> Client<TState> {
 
     fn run(&mut self) -> Result<(), String> {
         let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
-        let token = Token(1);
         let stream =
             TcpStream::connect(&addr).map_err(|e| format!("Could not connect to server: {:?}", e))?;
 
@@ -139,18 +141,46 @@ impl<TState: Send + 'static> Client<TState> {
 
         self.stream_state = Some(StreamState {
             stream,
-            token,
+            token: Token(0),
             is_writable: false,
             read_buffer: Vec::with_capacity(256),
         });
-        let mut events = Events::with_capacity(10);
-        let poll = Poll::new().map_err(|e| format!("Could not create poll: {:?}", e))?;
-        poll.register(
-            &self.stream_state.as_ref().unwrap().stream,
-            self.stream_state.as_ref().unwrap().token,
-            Ready::all(),
-            PollOpt::edge(),
-        ).map_err(|e| format!("Could not register stream: {:?}", e))?;
+
+        let mut poll =
+            PollWrapper::new().map_err(|e| format!("Could not create poll wrapper: {:?}", e))?;
+        {
+            let stream_state = self.stream_state.as_mut().unwrap();
+            stream_state.token = poll
+                .register(&stream_state.stream)
+                .map_err(|e| e.to_string())?;
+        }
+
+        poll.handle(|event, handle| {
+            if event.token() == self.stream_state.as_ref().unwrap().token {
+                self.stream_state.as_mut().unwrap().is_writable = event.readiness().is_writable();
+                if event.readiness().is_writable() && !self.write_buffer.is_empty() {
+                    self.process_write_buffer()?;
+                }
+                if event.readiness().is_readable() {
+                    loop {
+                        let stream_state = self.stream_state.as_mut().unwrap();
+                        let mut buffer = [0u8; 256];
+                        match stream_state.stream.read(&mut buffer[..]) {
+                            Ok(n) => {
+                                stream_state.read_buffer.extend(&buffer[..n]);
+                            }
+                            Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => break,
+                            Err(e) => {
+                                return Err(format!("Could not read from stream: {:?}", e));
+                            }
+                        }
+                    }
+                    self.try_process_line(handle)?;
+                }
+            }
+            Ok(())
+        })
+        /*
         while poll.poll(&mut events, None)
             .map_err(|e| format!("Could not poll: {:?}", e))? > 0
         {
@@ -182,6 +212,7 @@ impl<TState: Send + 'static> Client<TState> {
             }
         }
         Ok(())
+        */
     }
 
     /*
