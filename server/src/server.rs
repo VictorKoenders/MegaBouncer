@@ -1,40 +1,101 @@
-use client::Client;
+use client::{Client, ClientUpdate};
 use serde_json::{Map, Value};
-use serverhandle::ServerHandle;
-use shared::futures::sync::mpsc::{channel, Receiver};
-use shared::futures::Stream;
-use shared::tokio::net::TcpStream;
-use shared::tokio_io::io::WriteHalf;
-use shared::EmptyFuture;
+use shared::mio::net::TcpStream;
+use shared::mio::{Event, Token};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-/// The different messages that each client can emit to the central server
-#[derive(Debug)]
-pub enum ServerMessage {
-    /// Client is connected
-    ClientConnected(SocketAddr, WriteHalf<TcpStream>),
-    /// Client is disconnected, for whatever reason
-    ClientDisconnected(SocketAddr),
-    /// Client has send a valid JSON message
-    Message(SocketAddr, Value),
-}
-
 /// Temporarily holds a server. This will be consumed with the `start` fn
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Server {
-    receiver: Receiver<ServerMessage>,
+    clients: HashMap<Token, Client>,
 }
 
-/// The state of the server
-#[derive(Default, Debug)]
-struct ServerState {
-    clients: HashMap<SocketAddr, Client>,
-}
+impl Server {
+    /// Add a client to the server list
+    pub fn add(&mut self, stream: TcpStream, addr: SocketAddr, token: Token) {
+        println!("Accepted connection from {:?} ({:?})", addr, token);
+        self.clients.insert(token, Client::new(addr, stream));
+    }
 
-impl ServerState {
+    /// Handle an incoming event.
+    /// 
+    /// Specifically, this will look up the associated [Client] object, and call [Server::handle_updates].
+    pub fn handle(&mut self, event: Event) {
+        let updates;
+        let id;
+        let name;
+        if let Some(client) = self.clients.get_mut(&event.token()) {
+            updates = client.update(event);
+            name = client.name.clone();
+            id = client.id;
+        } else {
+            return;
+        }
+        if updates.iter().any(|u| u.is_disconnect()) {
+            self.clients.remove(&event.token());
+        }
+        self.handle_updates(updates, event.token(), name, id);
+    }
+
+    /// Handle a list of updates that were received from a client.
+    /// 
+    /// Optionally the token of the client can be provided.
+    fn handle_updates(
+        &mut self,
+        updates: Vec<ClientUpdate>,
+        token: Token,
+        name: Option<String>,
+        id: Uuid,
+    ) {
+        for update in updates {
+            match update {
+                ClientUpdate::Broadcast(mut message) => {
+                    if let Some(name) = &name {
+                        message
+                            .as_object_mut()
+                            .unwrap()
+                            .insert(String::from("sender"), Value::String(name.clone()));
+                        message
+                            .as_object_mut()
+                            .unwrap()
+                            .insert(String::from("id"), Value::String(id.to_string()));
+                    }
+                    self.broadcast(&message);
+                }
+                ClientUpdate::Identified(name) => {
+                    self.broadcast(&make_client_joined(&name, &id));
+                }
+                ClientUpdate::ListNodes => {
+                    let message = self.get_list();
+                    let name;
+                    let id;
+                    if let Some(client) = self.clients.get_mut(&token) {
+                        if let Err(e) = client.send(&message) {
+                            client.print_error(e);
+                            name = client.name.take();
+                            id = client.id;
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                    self.clients.remove(&token);
+                    if let Some(name) = name {
+                        self.broadcast(&make_client_disconnected(&name, &id));
+                    }
+                }
+                ClientUpdate::Disconnect => {
+                    if let Some(name) = &name {
+                        self.broadcast(&make_client_disconnected(name, &id));
+                    }
+                }
+            }
+        }
+    }
+
     /// Broadcast a given message to every client that is listening to this action
     fn broadcast(&mut self, message: &Value) {
         let action = if let Some(action) = message
@@ -46,9 +107,27 @@ impl ServerState {
             println!("Could not broadcast {:?}", message);
             return;
         };
-        for client in self.clients.values_mut() {
+        let mut clients_failed = Vec::new();
+        for (token, client) in &mut self.clients {
             if client.is_listening_to(action) {
-                client.send(message);
+                if let Err(e) = client.send(message) {
+                    client.print_error(e);
+                    let val = if let Some(name) = client.name.take() {
+                        Some((client.id, name))
+                    } else {
+                        None
+                    };
+                    clients_failed.push((token.clone(), val));
+                }
+            }
+        }
+
+        for token in &clients_failed {
+            self.clients.remove(&token.0);
+        }
+        for token in clients_failed {
+            if let Some((id, name)) = token.1 {
+                self.broadcast(&make_client_disconnected(&name, &id));
             }
         }
     }
@@ -86,171 +165,8 @@ impl ServerState {
     }
 }
 
-/// Handle a node.identify message
-/// If the message has a valid "name" property, the name will be set
-/// Else the client wil receive an error
-fn node_identify(addr: &SocketAddr, state: &mut ServerState, message: &Value) {
-    match message
-        .as_object()
-        .and_then(|o| o.get("name"))
-        .and_then(|s| s.as_str())
-    {
-        Some(s) if !s.trim().is_empty() => {
-            let mut uuid = None;
-            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                if client.name.is_some() {
-                    client.send(&make_error("Already identified"));
-                    return;
-                }
-                client.name = Some(s.to_string());
-                uuid = Some(client.id);
-            }
-            if let Some(uuid) = uuid {
-                state.broadcast(&make_client_joined(s, &uuid));
-            }
-        }
-        _ => {
-            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                client.send(&make_error("Missing required field 'name'"));
-            }
-        }
-    }
-}
-
-/// Register a channel that the current client is listening to
-fn node_register(addr: &SocketAddr, state: &mut ServerState, message: &Value) {
-    match message
-        .as_object()
-        .and_then(|o| o.get("channel"))
-        .and_then(|s| s.as_str())
-    {
-        Some(s) if !s.trim().is_empty() => {
-            let mut uuid = None;
-            let mut name = None;
-            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                if client.name.is_none() {
-                    client.send(&make_error("Not identified"));
-                } else {
-                    client.listening_to.push(s.to_string());
-                    uuid = Some(client.id);
-                    name = client.name.clone();
-                }
-            }
-            if let Some(uuid) = uuid {
-                if let Some(name) = name {
-                    state.broadcast(&make_client_listening_to(&name, s, &uuid));
-                }
-            }
-        }
-        _ => {
-            if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                client.send(&make_error("Missing required field 'channel'"));
-            }
-        }
-    }
-}
-
-/// Send a list to the client with all the other connected nodes
-fn node_list(addr: &SocketAddr, state: &mut ServerState) {
-    let list = state.get_list();
-    if let Some(ref mut client) = state.clients.get_mut(addr) {
-        if client.name.is_some() {
-            client.send(&list);
-        } else {
-            client.send(&make_error("Not identified"));
-        }
-    }
-}
-
-/// Send a broadcast message to all nodes in the network that are interested
-fn node_broadcast(addr: &SocketAddr, state: &mut ServerState, message: Value) {
-    let mut valid = false;
-    let mut message = message;
-    if let Some(ref mut client) = state.clients.get_mut(addr) {
-        if client.name.is_some() {
-            if let Some(ref mut o) = message.as_object_mut() {
-                o.insert(
-                    String::from("name"),
-                    Value::String(client.name.clone().unwrap()),
-                );
-                o.insert(String::from("id"), Value::String(client.id.to_string()));
-                valid = true;
-            }
-        } else {
-            client.send(&make_error("Not identified"));
-        }
-    }
-    if let Some(to) = if let Some(obj) = message.as_object_mut() {
-        obj.remove("to")
-            .and_then(|to| to.as_str().map(|s| s.to_string()))
-    } else {
-        None
-    } {
-        if let Some(ref mut client) = state.clients.values_mut().find(|c| c.id.to_string() == to) {
-            client.send(&message);
-            return;
-        }
-        if let Some(ref mut sender) = state.clients.get_mut(addr) {
-            sender.send(&make_error(&format!("Client '{}' not found", to)));
-        }
-        return;
-    }
-    if valid {
-        state.broadcast(&message);
-    }
-}
-
-impl Server {
-    /// Create a new server handle and server
-    pub fn new() -> (ServerHandle, Server) {
-        let (sender, receiver) = channel(10);
-
-        (ServerHandle::new(sender), Server { receiver })
-    }
-
-    /// Start the server
-    /// This will wait for messages from clients and handle them appropriately
-    pub fn start(self) -> EmptyFuture {
-        let state = Arc::new(Mutex::new(ServerState::default()));
-        Box::new(self.receiver.for_each(move |message| {
-            let mut state = state.lock().unwrap();
-            match message {
-                ServerMessage::ClientConnected(addr, write) => {
-                    state.clients.insert(addr, Client::new(addr, write));
-                }
-                ServerMessage::ClientDisconnected(addr) => {
-                    println!("Client disconnected");
-                    if let Some(mut c) = state.clients.remove(&addr) {
-                        println!("Client removed");
-                        if let Some(name) = c.name.take() {
-                            println!("Client disconnect broadcasted");
-                            state.broadcast(&make_client_disconnected(&name, &c.id));
-                        }
-                    }
-                }
-                ServerMessage::Message(addr, message) => match message
-                    .as_object()
-                    .and_then(|o| o.get("action"))
-                    .and_then(|s| s.as_str())
-                {
-                    Some("node.identify") => node_identify(&addr, &mut state, &message),
-                    Some("node.listener.register") => node_register(&addr, &mut state, &message),
-                    Some("node.list") => node_list(&addr, &mut state),
-                    Some(_) => node_broadcast(&addr, &mut state, message),
-                    None => {
-                        if let Some(ref mut client) = state.clients.get_mut(&addr) {
-                            client.send(&make_error("Missing required field 'action'"));
-                        }
-                    }
-                },
-            }
-            Ok(())
-        }))
-    }
-}
-
 /// Create an error object with the given name
-fn make_error(msg: &str) -> Value {
+pub fn make_error(msg: &str) -> Value {
     Value::Object({
         let mut map = Map::new();
         map.insert(String::from("action"), Value::String(String::from("error")));
@@ -260,7 +176,7 @@ fn make_error(msg: &str) -> Value {
 }
 
 /// Create an "node.identified" object with the given name and id
-fn make_client_joined(name: &str, uuid: &Uuid) -> Value {
+pub fn make_client_joined(name: &str, uuid: &Uuid) -> Value {
     Value::Object({
         let mut map = Map::new();
         map.insert(
@@ -274,7 +190,7 @@ fn make_client_joined(name: &str, uuid: &Uuid) -> Value {
 }
 
 /// Create an "node.disconnected" object with the given name and id
-fn make_client_disconnected(name: &str, uuid: &Uuid) -> Value {
+pub fn make_client_disconnected(name: &str, uuid: &Uuid) -> Value {
     Value::Object({
         let mut map = Map::new();
         map.insert(
@@ -288,7 +204,7 @@ fn make_client_disconnected(name: &str, uuid: &Uuid) -> Value {
 }
 
 /// Create an "node.channel.registered" object with the given name, channel and id
-fn make_client_listening_to(name: &str, channel: &str, uuid: &Uuid) -> Value {
+pub fn make_client_listening_to(name: &str, channel: &str, uuid: &Uuid) -> Value {
     Value::Object({
         let mut map = Map::new();
         map.insert(

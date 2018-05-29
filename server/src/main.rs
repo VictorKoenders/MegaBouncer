@@ -38,107 +38,34 @@
 
 extern crate shared;
 extern crate uuid;
-extern crate mio;
-#[macro_use]
 extern crate error_chain;
 
 /// holds a reference to the clients connected to the server
 pub mod client;
 /// The server logic
 pub mod server;
-/// A handle that can be passed around between futures and that will send values to the central server
-pub mod serverhandle;
 
-use shared::linereader;
-pub use shared::serde_json;
-use shared::mio::net::{TcpListener, TcpStream};
-use shared::mio::{Poll, Token, PollOpt, Ready, Events};
+use shared::serde_json;
+use shared::mio::net::TcpListener;
 
 fn main() {
     let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
     let listener = TcpListener::bind(&addr).unwrap();
 
-    let server = server::Server::new();
+    let mut server = server::Server::default();
 
-    let mut poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(1024);
-    let listener_token = Token(1);
-
-    poll.register(&listener, listener_token, Ready::readable(), PollOpt::edge()).unwrap();
-
-    loop {
-        poll.poll(&mut events, None).unwrap();
-        for event in &events {
-            if event.token() == listener_token {
-                server.client_connected(&poll, listener.accept().unwrap());
-            } else {
-                server.handle_child(&poll, )
-            }
-        }
-    }
-    /*
-    let listener = listener
-        .incoming()
-        .map_err(|err| {
-            println!("Could not listen for new clients: {:?}", err);
-        })
-        .for_each(move |socket| {
-            spawn_client(socket, &handle.clone());
-            Ok(())
-        });
+    let mut wrapper = shared::mio_poll_wrapper::PollWrapper::new().unwrap();
+    let server_token = wrapper.register(&listener).unwrap();
 
     println!("server running on localhost:6142");
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.spawn(listener);
-    runtime.spawn(server.start());
-    runtime.shutdown_on_idle().wait().unwrap();
-    */
+    let _: Result<(), ()> = wrapper.handle(|event, handle| {
+        if event.token() == server_token {
+            let (client, addr) = listener.accept().unwrap();
+            let token = handle.register(&client).unwrap();
+            server.add(client, addr, token);
+        } else {
+            server.handle(event);
+        }
+        Ok(())
+    });
 }
-
-/// Spawn a client with a given TcpStream and handle to the server
-fn spawn_client(socket: TcpStream, handle: &serverhandle::ServerHandle) {
-    let addr = socket.peer_addr().unwrap();
-    println!("accepted socket; addr={:?}", addr);
-    let mut handle = handle.clone();
-    let mut handle2 = handle.clone();
-    let mut handle3 = handle.clone();
-    let mut handle4 = handle.clone();
-    let (reader, writer) = socket.split();
-
-    let connection = linereader::LineReader::new(reader)
-        .map_err(move |e| {
-            println!("Could not read from client: {:?}", e);
-            tokio::spawn(
-                handle.client_disconnected(addr)
-                .map_err(|e| println!("Could not send value to central server"))
-            );
-        })
-        .for_each(move |line| {
-            let result: shared::EmptyFuture = match serde_json::from_str(&line) {
-                Ok(v) => Box::from(
-                    handle2
-                        .message_received(addr, v)
-                        .map_err(|e| println!("Could nto send value to central server: {:?}", e)),
-                ),
-                Err(e) => {
-                    println!("Could not parse JSON: '{:?}'", line);
-                    println!("{:?}", e);
-                    Box::from(futures::future::ok(()))
-                }
-            };
-            result
-        })
-        .and_then(move |_| {
-            println!("Client {:?} disconnected", addr);
-            handle3
-                .client_disconnected(addr)
-                .map_err(|e| println!("Could not send value to central server: {:?}", e))
-        });
-
-    tokio::spawn(
-        handle4
-            .client_connected(addr, writer)
-            .and_then(|_| connection),
-    );
-}
-*/
