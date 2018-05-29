@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+/*#![deny(missing_docs)]
 
 //! Server module for the MegaBouncer Project
 //! This application starts up a server on port 6142 and listens to incoming connections
@@ -49,20 +49,34 @@ pub mod server;
 /// A handle that can be passed around between futures and that will send values to the central server
 pub mod serverhandle;
 
-use shared::futures;
-use shared::futures::{Future, Stream};
 use shared::linereader;
 pub use shared::serde_json;
-use shared::tokio;
-use shared::tokio::net::{TcpListener, TcpStream};
-use shared::tokio_io::AsyncRead;
+use shared::mio::net::{TcpListener, TcpStream};
+use shared::mio::{Poll, Token, PollOpt, Ready, Events};
 
 fn main() {
     let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
     let listener = TcpListener::bind(&addr).unwrap();
 
-    let (handle, server) = server::Server::new();
+    let server = server::Server::new();
 
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(1024);
+    let listener_token = Token(1);
+
+    poll.register(&listener, listener_token, Ready::readable(), PollOpt::edge()).unwrap();
+
+    loop {
+        poll.poll(&mut events, None).unwrap();
+        for event in &events {
+            if event.token() == listener_token {
+                server.client_connected(&poll, listener.accept().unwrap());
+            } else {
+                server.handle_child(&poll, )
+            }
+        }
+    }
+    /*
     let listener = listener
         .incoming()
         .map_err(|err| {
@@ -78,6 +92,7 @@ fn main() {
     runtime.spawn(listener);
     runtime.spawn(server.start());
     runtime.shutdown_on_idle().wait().unwrap();
+    */
 }
 
 /// Spawn a client with a given TcpStream and handle to the server
@@ -126,3 +141,4 @@ fn spawn_client(socket: TcpStream, handle: &serverhandle::ServerHandle) {
             .and_then(|_| connection),
     );
 }
+*/

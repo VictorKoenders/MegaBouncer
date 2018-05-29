@@ -5,3 +5,4 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
 shared = { path = "../shared" }
+mio-child-process = "*"

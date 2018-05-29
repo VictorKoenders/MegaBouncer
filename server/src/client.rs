@@ -1,7 +1,6 @@
 use serde_json::{to_vec, Value};
-use shared::tokio::net::TcpStream;
-use shared::tokio_io::io::WriteHalf;
 use std::io::Write;
+use shared::mio::net::TcpStream;
 use std::net::SocketAddr;
 use uuid::Uuid;
 
@@ -15,7 +14,7 @@ pub struct Client {
     /// The remote address of the client
     address: SocketAddr,
     /// The writer that is associated with the TcpStream
-    writer: WriteHalf<TcpStream>,
+    writer: TcpStream,
     /// A list of channels that this client is listening to
     pub listening_to: Vec<String>,
 }
@@ -23,7 +22,7 @@ pub struct Client {
 impl Client {
     /// Create a new client with the given address and writer
     /// an ID will be automatically generated, and the client will not be listening to anything
-    pub fn new(address: SocketAddr, writer: WriteHalf<TcpStream>) -> Client {
+    pub fn new(address: SocketAddr, writer: TcpStream) -> Client {
         Client {
             id: Uuid::new_v4(),
             name: None,

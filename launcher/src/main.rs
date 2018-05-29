@@ -1,4 +1,5 @@
 extern crate shared;
+extern crate mio_child_process;
 
 use shared::serde_json::Value;
 
