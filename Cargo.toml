@@ -4,5 +4,7 @@ members = [
 	"server",
 	"client",
 	"test_tool",
-	"launcher"
+	"launcher",
+	"irc_connector",
+	"tcp_connector",
 ]

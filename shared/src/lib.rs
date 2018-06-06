@@ -6,6 +6,10 @@ pub extern crate serde_json;
 pub mod client;
 pub mod linereader;
 
+use serde_json::Value;
+use mio_poll_wrapper::Handle;
+use mio::{Token, Event};
+
 /// Checks if the given channel matches any of the channels in the list
 /// Channels match if:
 /// - They are an exact match, e.g. "test" and "test"
@@ -32,6 +36,25 @@ pub fn listening_to<T: AsRef<str>>(channels: &[T], action: &str) -> bool {
         return true;
     }
     false
+}
+
+pub struct Startup<'a, T: 'a> {
+    pub handle: &'a mut Handle,
+    pub state: &'a mut T,
+}
+
+pub struct ChannelUpdate<'a, T: 'a> {
+    pub channel: &'a str,
+    pub value: &'a Value,
+    pub handle: &'a mut Handle,
+    pub state: &'a mut T,
+}
+
+pub struct TokenUpdate<'a, T: 'a> {
+    pub handle: &'a mut Handle,
+    pub state: &'a mut T,
+    pub token: Token,
+    pub event: Event,
 }
 
 #[test]

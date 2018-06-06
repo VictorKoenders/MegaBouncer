@@ -2,12 +2,11 @@ extern crate mio_child_process;
 extern crate shared;
 
 use mio_child_process::{CommandAsync, Process};
-use std::sync::mpsc::TryRecvError;
-use std::process::{Command, Stdio};
-use shared::mio_poll_wrapper::Handle;
-use shared::mio::{Token, Event};
-use shared::serde_json::Value;
+use shared::mio::Token;
+use shared::{ChannelUpdate, TokenUpdate};
 use std::collections::HashMap;
+use std::process::{Command, Stdio};
+use std::sync::mpsc::TryRecvError;
 
 fn main() {
     let mut client = shared::client::Client::new("Launcher", State::default());
@@ -21,9 +20,9 @@ struct State {
     processes: HashMap<Token, (String, Process)>,
 }
 
-fn token_listener(state: &mut State, _handle: &mut Handle, token: Token, _event: Event) {
+fn token_listener(update: &mut TokenUpdate<State>) {
     let mut should_remove = false;
-    if let Some(process) = state.processes.get_mut(&token) {
+    if let Some(process) = update.state.processes.get_mut(&update.token) {
         println!("Processes updated: {:?}", process.0);
         loop {
             let result = match process.1.try_recv() {
@@ -39,13 +38,13 @@ fn token_listener(state: &mut State, _handle: &mut Handle, token: Token, _event:
     }
     if should_remove {
         println!("Process has ended!");
-        state.processes.remove(&token);
+        update.state.processes.remove(&update.token);
     }
 }
 
-fn launch_node(state: &mut State, handle: &mut Handle, _: &str, value: &Value) {
-    println!("Launching node {:?}", value["node_name"]);
-    if let Some(name) = value["node_name"].as_str() {
+fn launch_node(update: &mut ChannelUpdate<State>) {
+    println!("Launching node {:?}", update.value["node_name"]);
+    if let Some(name) = update.value["node_name"].as_str() {
         let mut dir = ::std::env::current_dir().unwrap();
         dir.push(name);
         let process = Command::new("cargo")
@@ -55,7 +54,13 @@ fn launch_node(state: &mut State, handle: &mut Handle, _: &str, value: &Value) {
             .stderr(Stdio::piped())
             .spawn_async()
             .expect("Could not spawn process");
-        let token = handle.register(&process).expect("Could not register process");
-        state.processes.insert(token, (name.to_owned(), process));
+        let token = update
+            .handle
+            .register(&process)
+            .expect("Could not register process");
+        update
+            .state
+            .processes
+            .insert(token, (name.to_owned(), process));
     }
 }

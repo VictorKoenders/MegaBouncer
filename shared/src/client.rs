@@ -1,14 +1,16 @@
 use mio::net::TcpStream;
-use mio::{Event, Token};
+use mio::Token;
 use mio_poll_wrapper::{Handle, PollWrapper};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use {ChannelUpdate, TokenUpdate, Startup};
 
-type Listener<TState> = fn(&mut TState, &mut Handle, &str, &Value);
-type TokenListener<TState> = fn(&mut TState, &mut Handle, Token, Event);
+type StartupListener<TState> = fn(&mut Startup<TState>);
+type ChannelListener<TState> = fn(&mut ChannelUpdate<TState>);
+type TokenListener<TState> = fn(&mut TokenUpdate<TState>);
 
 pub struct Client<TState: Send> {
     state: ClientState<TState>,
@@ -26,8 +28,9 @@ struct StreamState {
 struct ClientState<TState: Send> {
     name: String,
     state: TState,
-    listeners: HashMap<String, Listener<TState>>,
+    listeners: HashMap<String, ChannelListener<TState>>,
     evented_listener: Option<TokenListener<TState>>,
+    startup_listener: Option<StartupListener<TState>>,
 }
 
 impl<TState: Send> ClientState<TState> {
@@ -43,6 +46,12 @@ impl<TState: Send> ClientState<TState> {
                 return;
             }
         };
+        let mut update = ChannelUpdate {
+            channel: action,
+            value: json,
+            state: &mut self.state,
+            handle,
+        };
 
         for listener in self.listeners.iter().filter_map(|(k, v)| {
             if ::listening_to(&[k], action) {
@@ -51,7 +60,7 @@ impl<TState: Send> ClientState<TState> {
                 None
             }
         }) {
-            listener(&mut self.state, handle, action, &json);
+            listener(&mut update);
         }
     }
 }
@@ -64,18 +73,27 @@ impl<TState: Send + 'static> Client<TState> {
                 state,
                 listeners: HashMap::new(),
                 evented_listener: None,
+                startup_listener: None,
             },
             stream_state: None,
             write_buffer: Vec::with_capacity(256),
         }
     }
 
-    pub fn register_listener<T: Into<String>>(&mut self, name: T, listener: Listener<TState>) {
+    pub fn register_listener<T: Into<String>>(
+        &mut self,
+        name: T,
+        listener: ChannelListener<TState>,
+    ) {
         self.state.listeners.insert(name.into(), listener);
     }
 
     pub fn set_token_listener(&mut self, listener: TokenListener<TState>) {
         self.state.evented_listener = Some(listener);
+    }
+
+    pub fn on_startup(&mut self, listener: StartupListener<TState>) {
+        self.state.startup_listener = Some(listener);
     }
 
     pub fn launch(mut self) {
@@ -159,6 +177,15 @@ impl<TState: Send + 'static> Client<TState> {
                 .map_err(|e| e.to_string())?;
         }
 
+        if let Some(startup_listener) = self.state.startup_listener {
+            let mut startup = Startup {
+                handle: &mut poll,
+                state: &mut self.state.state,
+            };
+            startup_listener(&mut startup);
+        }
+
+
         poll.handle(|event, handle| {
             if event.token() == self.stream_state.as_ref().unwrap().token {
                 self.stream_state.as_mut().unwrap().is_writable = event.readiness().is_writable();
@@ -184,7 +211,13 @@ impl<TState: Send + 'static> Client<TState> {
                     self.try_process_line(handle)?;
                 }
             } else if let Some(listener) = self.state.evented_listener {
-                listener(&mut self.state.state, handle, event.token(), event);
+                let mut update = TokenUpdate {
+                    state: &mut self.state.state,
+                    handle,
+                    token: event.token(),
+                    event,
+                };
+                listener(&mut update);
             }
             Ok(())
         })

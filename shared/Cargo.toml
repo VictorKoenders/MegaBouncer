@@ -8,4 +8,4 @@ serde = "*"
 serde_json = "*"
 mio = "*"
 mio-extras = "*"
-mio-poll-wrapper = "*"
+mio-poll-wrapper = { path = "../libs/mio-poll-wrapper" }

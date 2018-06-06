@@ -47,6 +47,7 @@ pub mod server;
 
 use shared::serde_json;
 use shared::mio::net::TcpListener;
+use shared::mio_poll_wrapper::Handle;
 
 fn main() {
     let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
