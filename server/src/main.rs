@@ -1,4 +1,4 @@
-/*#![deny(missing_docs)]
+#![deny(missing_docs)]
 
 //! Server module for the MegaBouncer Project
 //! This application starts up a server on port 6142 and listens to incoming connections

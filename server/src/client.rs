@@ -1,5 +1,4 @@
 use serde_json::{to_vec, Value};
-use std::io::Write;
 use shared::mio::Event;
 use shared::mio::net::TcpStream;
 use std::net::SocketAddr;
@@ -20,8 +19,6 @@ pub struct Client {
     read_buff: Vec<u8>,
     is_writable: bool,
     is_readable: bool,
-    /// The writer that is associated with the TcpStream
-    writer: TcpStream,
     /// A list of channels that this client is listening to
     pub listening_to: Vec<String>,
 }
@@ -59,6 +56,7 @@ impl Client {
     fn process_write(&mut self) -> Result<()> {
         loop {
             if self.write_buff.len() == 0 {
+                self.is_writable = true;
                 return Ok(());
             }
             return match self.stream.write(&self.write_buff) {

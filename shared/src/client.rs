@@ -1,5 +1,5 @@
 use mio::net::TcpStream;
-use mio::Token;
+use mio::{Event, Token};
 use mio_poll_wrapper::{Handle, PollWrapper};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 
 type Listener<TState> = fn(&mut TState, &mut Handle, &str, &Value);
+type TokenListener<TState> = fn(&mut TState, &mut Handle, Token, Event);
 
 pub struct Client<TState: Send> {
     state: ClientState<TState>,
@@ -26,12 +27,12 @@ struct ClientState<TState: Send> {
     name: String,
     state: TState,
     listeners: HashMap<String, Listener<TState>>,
+    evented_listener: Option<TokenListener<TState>>,
 }
 
 impl<TState: Send> ClientState<TState> {
     fn json_received(&mut self, json: &Value, handle: &mut Handle) {
-        let action = match json
-            .as_object()
+        let action = match json.as_object()
             .and_then(|o| o.get("action"))
             .and_then(|a| a.as_str())
         {
@@ -62,6 +63,7 @@ impl<TState: Send + 'static> Client<TState> {
                 name: name.into(),
                 state,
                 listeners: HashMap::new(),
+                evented_listener: None,
             },
             stream_state: None,
             write_buffer: Vec::with_capacity(256),
@@ -70,6 +72,10 @@ impl<TState: Send + 'static> Client<TState> {
 
     pub fn register_listener<T: Into<String>>(&mut self, name: T, listener: Listener<TState>) {
         self.state.listeners.insert(name.into(), listener);
+    }
+
+    pub fn set_token_listener(&mut self, listener: TokenListener<TState>) {
+        self.state.evented_listener = Some(listener);
     }
 
     pub fn launch(mut self) {
@@ -94,8 +100,7 @@ impl<TState: Send + 'static> Client<TState> {
     }
 
     fn process_write_buffer(&mut self) -> Result<(), String> {
-        match self
-            .stream_state
+        match self.stream_state
             .as_mut()
             .unwrap()
             .stream
@@ -150,8 +155,7 @@ impl<TState: Send + 'static> Client<TState> {
             PollWrapper::new().map_err(|e| format!("Could not create poll wrapper: {:?}", e))?;
         {
             let stream_state = self.stream_state.as_mut().unwrap();
-            stream_state.token = poll
-                .register(&stream_state.stream)
+            stream_state.token = poll.register(&stream_state.stream)
                 .map_err(|e| e.to_string())?;
         }
 
@@ -169,7 +173,9 @@ impl<TState: Send + 'static> Client<TState> {
                             Ok(n) => {
                                 stream_state.read_buffer.extend(&buffer[..n]);
                             }
-                            Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => break,
+                            Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => {
+                                break;
+                            }
                             Err(e) => {
                                 return Err(format!("Could not read from stream: {:?}", e));
                             }
@@ -177,85 +183,12 @@ impl<TState: Send + 'static> Client<TState> {
                     }
                     self.try_process_line(handle)?;
                 }
+            } else if let Some(listener) = self.state.evented_listener {
+                listener(&mut self.state.state, handle, event.token(), event);
             }
             Ok(())
         })
-        /*
-        while poll.poll(&mut events, None)
-            .map_err(|e| format!("Could not poll: {:?}", e))? > 0
-        {
-            for event in &events {
-                println!("{:?}", event);
-                if event.token() == self.stream_state.as_ref().unwrap().token {
-                    self.stream_state.as_mut().unwrap().is_writable =
-                        event.readiness().is_writable();
-                    if event.readiness().is_writable() && !self.write_buffer.is_empty() {
-                        self.process_write_buffer()?;
-                    }
-                    if event.readiness().is_readable() {
-                        loop {
-                            let stream_state = self.stream_state.as_mut().unwrap();
-                            let mut buffer = [0u8; 256];
-                            match stream_state.stream.read(&mut buffer[..]) {
-                                Ok(n) => {
-                                    stream_state.read_buffer.extend(&buffer[..n]);
-                                }
-                                Err(ref e) if e.kind() == ::std::io::ErrorKind::WouldBlock => break,
-                                Err(e) => {
-                                    return Err(format!("Could not read from stream: {:?}", e));
-                                }
-                            }
-                        }
-                        self.try_process_line()?;
-                    }
-                }
-            }
-        }
-        Ok(())
-        */
     }
-
-    /*
-    fn run(&mut self) -> ::EmptyFuture {
-        let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
-        let state = self.state.clone();
-        Box::from(
-            TcpStream::connect(&addr)
-                .map_err(|e| {
-                    println!("Could not connected to server");
-                    println!("{:?}", e);
-                })
-                .and_then(move |mut stream| {
-                    let state = state.clone();
-                    println!("Connected to server");
-                    stream.write_async(&Identify(state.lock().unwrap().name.clone()));
-                    for listener in state.lock().unwrap().listeners.keys() {
-                        stream.write_async(&RegisterListener(listener.clone()));
-                    }
-                    let reader = ::linereader::LineReader::new(stream);
-                    reader
-                        .for_each(move |line| {
-                            let state = state.clone();
-                            match ::serde_json::from_str(&line) {
-                                Ok(v) => {
-                                    println!("{:?}", v);
-                                    let actions = state.lock().unwrap().json_received(v);
-                                }
-                                Err(e) => {
-                                    println!("Could not parse JSON: {:?}", e);
-                                    println!("{:?}", line);
-                                }
-                            }
-                            Ok(())
-                        })
-                        .map_err(|e| {
-                            println!("Could not read from server");
-                            println!("{:?}", e);
-                        })
-                }),
-        )
-    }
-    */
 }
 
 pub struct Identify(String);
