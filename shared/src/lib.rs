@@ -42,12 +42,14 @@ pub fn listening_to<T: AsRef<str>>(channels: &[T], action: &str) -> bool {
 
 pub struct Startup<'a, T: 'a> {
     pub handle: &'a mut Handle,
+    pub emit: Vec<Value>,
     pub state: &'a mut T,
 }
 
 pub struct ChannelUpdate<'a, T: 'a> {
     pub channel: &'a str,
     pub value: &'a Value,
+    pub emit: Vec<Value>,
     pub handle: &'a mut Handle,
     pub state: &'a mut T,
 }
@@ -55,6 +57,7 @@ pub struct ChannelUpdate<'a, T: 'a> {
 pub struct TokenUpdate<'a, T: 'a> {
     pub handle: &'a mut Handle,
     pub state: &'a mut T,
+    pub emit: Vec<Value>,
     pub token: Token,
     pub event: Event,
 }

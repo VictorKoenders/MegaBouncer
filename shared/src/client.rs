@@ -7,6 +7,7 @@ use client_state::ClientState;
 use std::io::{Read, Write};
 use {ChannelUpdate, TokenUpdate, Startup};
 use messages::{Identify, RegisterListener};
+use serde_json::Value;
 
 pub type StartupListener<TState> = fn(&mut Startup<TState>);
 pub type ChannelListener<TState> = fn(&mut ChannelUpdate<TState>);
@@ -93,21 +94,23 @@ impl<TState: Send + 'static> Client<TState> {
         }
     }
 
-    fn try_process_line(&mut self, handle: &mut Handle) -> Result<(), String> {
+    fn try_process_line(&mut self, handle: &mut Handle) -> Result<Vec<Value>, String> {
+        let mut result = Vec::new();
         let stream_state = self.stream_state.as_mut().unwrap();
         while let Some(position) = stream_state.read_buffer.iter().position(|c| *c == b'\n') {
             {
                 let line = ::std::str::from_utf8(&stream_state.read_buffer[..position])
                     .map_err(|e| format!("Could not read a valid utf8-string: {:?}", e))?
                     .trim();
-                match ::serde_json::from_str(line) {
+                let emits = match ::serde_json::from_str(line) {
                     Ok(v) => self.state.json_received(&v, handle),
                     Err(e) => return Err(format!("Could not parse json: {:?}", e)),
-                }
+                };
+                result.extend(emits.into_iter());
             }
             stream_state.read_buffer.drain(..position + 1);
         }
-        Ok(())
+        Ok(result)
     }
 
     fn run(&mut self) -> Result<(), String> {
@@ -138,11 +141,18 @@ impl<TState: Send + 'static> Client<TState> {
         }
 
         if let Some(startup_listener) = self.state.startup_listener {
-            let mut startup = Startup {
-                handle: &mut poll,
-                state: &mut self.state.state,
+            let emits = {
+                let mut startup = Startup {
+                    handle: &mut poll,
+                    emit: Vec::new(),
+                    state: &mut self.state.state,
+                };
+                startup_listener(&mut startup);
+                startup.emit
             };
-            startup_listener(&mut startup);
+            for msg in emits {
+                self.write(&msg)?;
+            }
         }
         self.poll_handle(poll)
     }
@@ -173,13 +183,20 @@ impl<TState: Send + 'static> Client<TState> {
                     self.try_process_line(handle)?;
                 }
             } else if let Some(listener) = self.state.evented_listener {
-                let mut update = TokenUpdate {
-                    state: &mut self.state.state,
-                    handle,
-                    token: event.token(),
-                    event,
+                let emits = {
+                    let mut update = TokenUpdate {
+                        state: &mut self.state.state,
+                        handle,
+                        emit: Vec::new(),
+                        token: event.token(),
+                        event,
+                    };
+                    listener(&mut update);
+                    update.emit
                 };
-                listener(&mut update);
+                for msg in emits {
+                    self.write(&msg)?;
+                }
             }
             Ok(())
         })

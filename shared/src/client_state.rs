@@ -24,7 +24,7 @@ impl<TState: Send> ClientState<TState> {
             startup_listener: None,
         }
     }
-    pub fn json_received(&mut self, json: &Value, handle: &mut Handle) {
+    pub fn json_received(&mut self, json: &Value, handle: &mut Handle) -> Vec<Value> {
         let action = match json.as_object()
             .and_then(|o| o.get("action"))
             .and_then(|a| a.as_str())
@@ -33,12 +33,13 @@ impl<TState: Send> ClientState<TState> {
             None => {
                 println!("JSON does not have an action");
                 println!("{:?}", json);
-                return;
+                return Vec::new();
             }
         };
         let mut update = ChannelUpdate {
             channel: action,
             value: json,
+            emit: Vec::new(),
             state: &mut self.state,
             handle,
         };
@@ -52,5 +53,6 @@ impl<TState: Send> ClientState<TState> {
         }) {
             listener(&mut update);
         }
+        update.emit
     }
 }

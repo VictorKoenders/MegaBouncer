@@ -1,15 +1,20 @@
 // #![windows_subsystem = "windows"]
 #![allow(deprecated)]
 
-extern crate web_view;
+extern crate serde_json;
 extern crate shared;
+extern crate web_view;
 
-use std::thread::{sleep_ms, spawn};
+use std::thread::spawn;
 use web_view::*;
 
 #[derive(Default, Debug)]
-struct UserState {
+struct UIState {
     pub modules: Vec<Module>,
+}
+
+struct ClientState {
+    webview: MyUnique<WebView<'static, UIState>>,
 }
 
 #[derive(Debug)]
@@ -20,7 +25,7 @@ pub struct Module {
 }
 
 fn main() {
-    let (result_userdata, success) = run(
+    let (_result_userdata, success) = run(
         "Megabouncer",
         Content::Html(HTML),
         Some((800, 600)),
@@ -31,20 +36,31 @@ fn main() {
         Default::default(),
     );
     println!("Success? {:?}", success);
-    println!("Last user data: {:?}", result_userdata);
 }
 
-fn init_cb(webview: MyUnique<WebView<'static, UserState>>) {
-    spawn(move || loop {
-        {
-            webview.dispatch(|webview, userdata| {
-            });
-        }
-        sleep_ms(1000);
+fn client_all_received(update: &mut shared::ChannelUpdate<ClientState>) {
+    let str = format!(
+        "message_received(\"{}\", {:?})",
+        update.channel,
+        serde_json::to_string(&update.value).unwrap()
+    );
+    update.state.webview.dispatch(move |webview, _| {
+        webview.eval(&str);
     });
 }
 
-fn invoke_cb(webview: &mut WebView<UserState>, arg: &str, userdata: &mut UserState) {
+fn init_cb(webview: MyUnique<WebView<'static, UIState>>) {
+    spawn(move || {
+        let mut client = shared::client::Client::new("client", ClientState { webview });
+        client.register_listener("*", client_all_received);
+        client.on_startup(|startup| {
+            startup.emit.push(serde_json::from_str("{\"action\":\"node.list\"}").unwrap());
+        });
+        client.launch();
+    });
+}
+
+fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, _userdata: &mut UIState) {
     let mut iter = arg.split(':');
     match iter.next() {
         Some("exit") => {
@@ -69,23 +85,27 @@ const HTML: &str = r#"
 <!doctype html>
 <html>
 	<body>
-		<p id="ticks"></p>
-		<button onclick="external.invoke('reset')">reset</button>
-		<button onclick="external.invoke('exit')">exit</button>
+		<p id="output"></p>
 		<script type="text/javascript">
-			function updateTicks(u) {
-				document.getElementById('ticks').innerHTML = 'userdata ' + u;
-			}
+            window.onerror = function(message, source, lineno, colno, error) {
+                console.log(message, source, lineno, colno, error);
+            }
 			console.log = function(){
-				var args = "log:";
+				var args = "log";
 				for(var i = 0; i < arguments.length; i++) {
-					args += arguments[i];
+					args += ":" + JSON.stringify(arguments[i]);
 				}
 				external.invoke(args);
 			}
 			document.onkeydown = function(e){
 				external.invoke("keydown:" + e.keyCode);
 			}
+
+            var output = document.getElementById("output");
+            function message_received(channel, json){
+                console.log(channel, json);
+                output.innerHTML = "<b>" + channel + "</b>: " + json + "<br />" + output.innerHTML;
+            }
 		</script>
 	</body>
 </html>
