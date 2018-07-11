@@ -1,16 +1,16 @@
+use std::path::Path;
 use mio::net::TcpStream;
 use mio::Token;
 use mio_poll_wrapper::{Handle, PollWrapper};
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-use serde_json::Value;
-use std::collections::HashMap;
+use serde::Serialize;
+use client_state::ClientState;
 use std::io::{Read, Write};
 use {ChannelUpdate, TokenUpdate, Startup};
+use messages::{Identify, RegisterListener};
 
-type StartupListener<TState> = fn(&mut Startup<TState>);
-type ChannelListener<TState> = fn(&mut ChannelUpdate<TState>);
-type TokenListener<TState> = fn(&mut TokenUpdate<TState>);
+pub type StartupListener<TState> = fn(&mut Startup<TState>);
+pub type ChannelListener<TState> = fn(&mut ChannelUpdate<TState>);
+pub type TokenListener<TState> = fn(&mut TokenUpdate<TState>);
 
 pub struct Client<TState: Send> {
     state: ClientState<TState>,
@@ -25,56 +25,10 @@ struct StreamState {
     read_buffer: Vec<u8>,
 }
 
-struct ClientState<TState: Send> {
-    name: String,
-    state: TState,
-    listeners: HashMap<String, ChannelListener<TState>>,
-    evented_listener: Option<TokenListener<TState>>,
-    startup_listener: Option<StartupListener<TState>>,
-}
-
-impl<TState: Send> ClientState<TState> {
-    fn json_received(&mut self, json: &Value, handle: &mut Handle) {
-        let action = match json.as_object()
-            .and_then(|o| o.get("action"))
-            .and_then(|a| a.as_str())
-        {
-            Some(a) => a,
-            None => {
-                println!("JSON does not have an action");
-                println!("{:?}", json);
-                return;
-            }
-        };
-        let mut update = ChannelUpdate {
-            channel: action,
-            value: json,
-            state: &mut self.state,
-            handle,
-        };
-
-        for listener in self.listeners.iter().filter_map(|(k, v)| {
-            if ::listening_to(&[k], action) {
-                Some(v)
-            } else {
-                None
-            }
-        }) {
-            listener(&mut update);
-        }
-    }
-}
-
 impl<TState: Send + 'static> Client<TState> {
     pub fn new<T: Into<String>>(name: T, state: TState) -> Client<TState> {
         Client {
-            state: ClientState {
-                name: name.into(),
-                state,
-                listeners: HashMap::new(),
-                evented_listener: None,
-                startup_listener: None,
-            },
+            state: ClientState::new(name.into(), state),
             stream_state: None,
             write_buffer: Vec::with_capacity(256),
         }
@@ -86,6 +40,12 @@ impl<TState: Send + 'static> Client<TState> {
         listener: ChannelListener<TState>,
     ) {
         self.state.listeners.insert(name.into(), listener);
+    }
+
+    pub fn register_user_interface(&mut self, javascript: impl AsRef<Path>) {
+        let mut str = String::new();
+        ::std::fs::File::open(javascript.as_ref()).unwrap().read_to_string(&mut str).unwrap();
+        self.state.user_interface = Some(str);
     }
 
     pub fn set_token_listener(&mut self, listener: TokenListener<TState>) {
@@ -184,8 +144,10 @@ impl<TState: Send + 'static> Client<TState> {
             };
             startup_listener(&mut startup);
         }
+        self.poll_handle(poll)
+    }
 
-
+    fn poll_handle(&mut self, poll: PollWrapper)  -> Result<(), String> {
         poll.handle(|event, handle| {
             if event.token() == self.stream_state.as_ref().unwrap().token {
                 self.stream_state.as_mut().unwrap().is_writable = event.readiness().is_writable();
@@ -221,33 +183,5 @@ impl<TState: Send + 'static> Client<TState> {
             }
             Ok(())
         })
-    }
-}
-
-pub struct Identify(String);
-
-impl Serialize for Identify {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_struct("Identify", 2)?;
-        s.serialize_field("action", "node.identify")?;
-        s.serialize_field("name", &self.0)?;
-        s.end()
-    }
-}
-
-pub struct RegisterListener(String);
-
-impl Serialize for RegisterListener {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_struct("RegisterListener", 2)?;
-        s.serialize_field("action", "node.listener.register")?;
-        s.serialize_field("channel", &self.0)?;
-        s.end()
     }
 }

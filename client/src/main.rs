@@ -2,13 +2,21 @@
 #![allow(deprecated)]
 
 extern crate web_view;
+extern crate shared;
 
 use std::thread::{sleep_ms, spawn};
 use web_view::*;
 
 #[derive(Default, Debug)]
 struct UserState {
-    pub counter: i32,
+    pub modules: Vec<Module>,
+}
+
+#[derive(Debug)]
+pub struct Module {
+    id: String,
+    name: String,
+    ui: Option<String>,
 }
 
 fn main() {
@@ -30,8 +38,6 @@ fn init_cb(webview: MyUnique<WebView<'static, UserState>>) {
     spawn(move || loop {
         {
             webview.dispatch(|webview, userdata| {
-                userdata.counter -= 1;
-                render(webview, userdata);
             });
         }
         sleep_ms(1000);
@@ -41,16 +47,11 @@ fn init_cb(webview: MyUnique<WebView<'static, UserState>>) {
 fn invoke_cb(webview: &mut WebView<UserState>, arg: &str, userdata: &mut UserState) {
     let mut iter = arg.split(':');
     match iter.next() {
-        Some("reset") => {
-            userdata.counter += 10;
-            render(webview, userdata);
-        }
         Some("exit") => {
             webview.terminate();
         }
         Some("keydown") => {
             if let Some(Ok(code)) = iter.next().map(|c| c.parse::<i32>()) {
-                println!("Key code {:?}", code);
                 if code == 27 {
                     webview.terminate();
                 }
@@ -62,10 +63,6 @@ fn invoke_cb(webview: &mut WebView<UserState>, arg: &str, userdata: &mut UserSta
         }
         _ => unimplemented!(),
     }
-}
-
-fn render(webview: &mut WebView<UserState>, userdata: &UserState) {
-    webview.eval(&format!("updateTicks({})", userdata.counter));
 }
 
 const HTML: &str = r#"

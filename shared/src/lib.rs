@@ -4,7 +4,9 @@ pub extern crate serde;
 pub extern crate serde_json;
 
 pub mod client;
+pub mod client_state;
 pub mod linereader;
+pub mod messages;
 
 use serde_json::Value;
 use mio_poll_wrapper::Handle;

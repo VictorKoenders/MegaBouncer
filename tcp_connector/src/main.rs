@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate base64;
 extern crate shared;
 
@@ -5,8 +7,8 @@ use shared::mio::net::TcpStream;
 use shared::mio::Token;
 use shared::mio_poll_wrapper::Handle;
 use shared::serde_json::Value;
-use shared::{ChannelUpdate, TokenUpdate};
-use std::io::{ErrorKind, Read, Write};
+use shared::ChannelUpdate;
+use std::io::{ErrorKind, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 
@@ -73,7 +75,7 @@ fn status(update: &mut ChannelUpdate<State>) {
         Some(Value::Number(p)) => p.as_u64().unwrap_or_else(|| 0) as u16,
         _ => return,
     };
-    let connection = update.state.get_or_create(update.handle, host, port);
+    let _connection = update.state.get_or_create(update.handle, host, port);
     // TODO: Send response
 }
 
