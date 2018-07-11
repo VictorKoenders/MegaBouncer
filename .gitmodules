@@ -1,0 +1,3 @@
+[submodule "mio-poll-wrapper"]
+	path = libs/mio-poll-wrapper
+	url = https://github.com/trangar/mio-poll-wrapper
