@@ -4,6 +4,9 @@
 extern crate serde_json;
 extern crate shared;
 extern crate web_view;
+extern crate hyper;
+
+mod web_server;
 
 use std::thread::spawn;
 use web_view::*;
@@ -25,9 +28,11 @@ pub struct Module {
 }
 
 fn main() {
+    let url = web_server::serve();
+    println!("Requesting {:?}", url);
     let (_result_userdata, success) = run(
         "Megabouncer",
-        Content::Html(HTML),
+        Content::Url(url),
         Some((800, 600)),
         true,
         true,
@@ -80,33 +85,3 @@ fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, _userdata: &mut UIState)
         _ => unimplemented!(),
     }
 }
-
-const HTML: &str = r#"
-<!doctype html>
-<html>
-	<body>
-		<p id="output"></p>
-		<script type="text/javascript">
-            window.onerror = function(message, source, lineno, colno, error) {
-                console.log(message, source, lineno, colno, error);
-            }
-			console.log = function(){
-				var args = "log";
-				for(var i = 0; i < arguments.length; i++) {
-					args += ":" + JSON.stringify(arguments[i]);
-				}
-				external.invoke(args);
-			}
-			document.onkeydown = function(e){
-				external.invoke("keydown:" + e.keyCode);
-			}
-
-            var output = document.getElementById("output");
-            function message_received(channel, json){
-                console.log(channel, json);
-                output.innerHTML = "<b>" + channel + "</b>: " + json + "<br />" + output.innerHTML;
-            }
-		</script>
-	</body>
-</html>
-"#;

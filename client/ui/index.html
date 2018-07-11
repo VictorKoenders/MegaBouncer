@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Hello React!</title>
+</head>
+
+<body>
+    <div id="example"></div>
+
+    <!-- Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+
+    <!-- Main -->
+    <script type="text/javascript">
+        window.onerror = function (message, source, lineno, colno, error) {
+            console.log(message, source, lineno, colno, error);
+        }
+        console.log = function () {
+            var args = "log";
+            for (var i = 0; i < arguments.length; i++) {
+                args += ":" + JSON.stringify(arguments[i]);
+            }
+            external.invoke(args);
+        }
+        document.onkeydown = function (e) {
+            external.invoke("keydown:" + e.keyCode);
+        }
+        function message_received(channel, value){
+            value = JSON.parse(value);
+            console.log(channel, value);
+        }
+    </script>
+    <script src="./bundle.js"></script>
+</body>
+
+</html>

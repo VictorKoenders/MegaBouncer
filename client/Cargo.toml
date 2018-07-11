@@ -8,3 +8,8 @@ web-view = { git = "https://github.com/Boscop/web-view", rev = "d416fa4bce75f020
 urlencoding = "*"
 serde_json = "*"
 shared = { path = "../shared" }
+hyper = "*"
+futures = "*"
+tokio-fs = "*"
+tokio-io = "*"
+
