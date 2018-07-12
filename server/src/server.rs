@@ -47,10 +47,37 @@ impl Server {
         updates: Vec<ClientUpdate>,
         token: Token,
         name: Option<String>,
-        id: Uuid,
+        sender_id: Uuid,
     ) {
         for update in updates {
             match update {
+                ClientUpdate::SendTo(id, mut message) => {
+                    if let Some(name) = &name {
+                        message
+                            .as_object_mut()
+                            .unwrap()
+                            .insert(String::from("sender"), Value::String(name.clone()));
+                        message
+                            .as_object_mut()
+                            .unwrap()
+                            .insert(String::from("sender_id"), Value::String(sender_id.to_string()));
+                    }
+                    let mut err = None;
+                    {
+                        if let Some(client) = self.clients.values_mut().find(|c| c.id.to_string() == id) {
+                            if let Err(e) = client.send(&message) {
+                                err = Some(e.to_string());
+                            }
+                        } else {
+                            err = Some(format!("Client {:?} not found", id));
+                        }
+                    }
+                    if let Some(err) = err {
+                        if let Some(client) = self.clients.get_mut(&token) {
+                            client.print_error(err);
+                        }
+                    }
+                }
                 ClientUpdate::Broadcast(mut message) => {
                     if let Some(name) = &name {
                         message
@@ -60,12 +87,12 @@ impl Server {
                         message
                             .as_object_mut()
                             .unwrap()
-                            .insert(String::from("id"), Value::String(id.to_string()));
+                            .insert(String::from("sender_id"), Value::String(sender_id.to_string()));
                     }
                     self.broadcast(&message);
                 }
                 ClientUpdate::Identified(name) => {
-                    self.broadcast(&make_client_joined(&name, &id));
+                    self.broadcast(&make_client_joined(&name, &sender_id));
                 }
                 ClientUpdate::ListNodes => {
                     let message = self.get_list();
@@ -89,7 +116,7 @@ impl Server {
                 }
                 ClientUpdate::Disconnect => {
                     if let Some(name) = &name {
-                        self.broadcast(&make_client_disconnected(name, &id));
+                        self.broadcast(&make_client_disconnected(name, &sender_id));
                     }
                 }
             }

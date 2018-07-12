@@ -1,4 +1,5 @@
 pub extern crate mio;
+pub extern crate mio_extras;
 pub extern crate mio_poll_wrapper;
 pub extern crate serde;
 pub extern crate serde_json;
@@ -50,6 +51,7 @@ pub struct ChannelUpdate<'a, T: 'a> {
     pub channel: &'a str,
     pub value: &'a Value,
     pub emit: Vec<Value>,
+    pub reply: Vec<Value>,
     pub handle: &'a mut Handle,
     pub state: &'a mut T,
 }

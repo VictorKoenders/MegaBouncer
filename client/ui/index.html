@@ -28,9 +28,10 @@
         document.onkeydown = function (e) {
             external.invoke("keydown:" + e.keyCode);
         }
-        function message_received(channel, value){
+        window.message_received = function(){};
+        function external_message_received(channel, value){
             value = JSON.parse(value);
-            console.log(channel, value);
+            window.message_received(channel, value);
         }
     </script>
     <script src="./bundle.js"></script>

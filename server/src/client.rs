@@ -134,7 +134,13 @@ impl Client {
             match action {
                 Some("node.listener.register") => self.register_listener(&json),
                 Some("node.list") => Some(ClientUpdate::ListNodes),
-                Some(_) => Some(ClientUpdate::Broadcast(json.clone())),
+                Some(_) => {
+                    if let Some(uuid) = json.get("target").and_then(|s| s.as_str()) {
+                        Some(ClientUpdate::SendTo(uuid.to_string(), json.clone()))
+                    } else {
+                        Some(ClientUpdate::Broadcast(json.clone()))
+                    }
+                },
                 None => {
                     if let Err(e) = self.send(&::server::make_error("Missing required field 'action'")) {
                         self.print_error(e);
@@ -233,6 +239,9 @@ impl Client {
 /// Contains the different updates a client can request from a server.
 #[derive(Debug)]
 pub enum ClientUpdate {
+    /// Send a value to a given client
+    SendTo(String, Value),
+
     /// Broadcast a given message to all clients
     Broadcast(Value),
 

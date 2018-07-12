@@ -1,22 +1,25 @@
 // #![windows_subsystem = "windows"]
 #![allow(deprecated)]
 
+extern crate hyper;
 extern crate serde_json;
 extern crate shared;
 extern crate web_view;
-extern crate hyper;
 
 mod web_server;
+// mod client;
 
-use std::thread::spawn;
+use shared::client::ClientHandle;
+use shared::ChannelUpdate;
+use std::thread::{sleep_ms, spawn};
 use web_view::*;
 
-#[derive(Default, Debug)]
-struct UIState {
-    pub modules: Vec<Module>,
+#[derive(Default)]
+pub struct UIState {
+    handle: Option<ClientHandle>,
 }
 
-struct ClientState {
+pub struct ClientState {
     webview: MyUnique<WebView<'static, UIState>>,
 }
 
@@ -43,29 +46,43 @@ fn main() {
     println!("Success? {:?}", success);
 }
 
-fn client_all_received(update: &mut shared::ChannelUpdate<ClientState>) {
+fn init_cb(webview: MyUnique<WebView<'static, UIState>>) {
+    spawn(move || {
+        sleep_ms(1000);
+        let mut client = shared::client::Client::new(
+            "client",
+            ClientState {
+                webview: webview.clone(),
+            },
+        );
+        client.register_listener("*", client_all_received);
+        client.on_startup(|startup| {
+            startup
+                .emit
+                .push(serde_json::from_str("{\"action\":\"node.list\"}").unwrap());
+        });
+        let handle = client.launch_async();
+
+        webview.dispatch(move |_, state| {
+            let handle = handle.clone();
+            state.handle = Some(handle);
+        });
+    });
+}
+
+fn client_all_received(update: &mut ChannelUpdate<ClientState>) {
     let str = format!(
-        "message_received(\"{}\", {:?})",
+        "external_message_received(\"{}\", {:?})",
         update.channel,
         serde_json::to_string(&update.value).unwrap()
     );
+    println!("{}", str);
     update.state.webview.dispatch(move |webview, _| {
         webview.eval(&str);
     });
 }
 
-fn init_cb(webview: MyUnique<WebView<'static, UIState>>) {
-    spawn(move || {
-        let mut client = shared::client::Client::new("client", ClientState { webview });
-        client.register_listener("*", client_all_received);
-        client.on_startup(|startup| {
-            startup.emit.push(serde_json::from_str("{\"action\":\"node.list\"}").unwrap());
-        });
-        client.launch();
-    });
-}
-
-fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, _userdata: &mut UIState) {
+fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, userdata: &mut UIState) {
     let mut iter = arg.split(':');
     match iter.next() {
         Some("exit") => {
@@ -81,6 +98,12 @@ fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, _userdata: &mut UIState)
         Some("log") => {
             let line = iter.collect::<Vec<_>>().join(", ");
             println!("{}", line);
+        }
+        Some("emit") => {
+            let remaining = iter.collect::<Vec<_>>().join(":");
+            let value: serde_json::Value = serde_json::from_str(&remaining).unwrap();
+            println!("Sending {:?}", value);
+            userdata.handle.as_mut().unwrap().send(value);
         }
         _ => unimplemented!(),
     }
