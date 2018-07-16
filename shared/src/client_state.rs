@@ -2,7 +2,7 @@ use client::{ChannelListener, StartupListener, TokenListener};
 use mio::Token;
 use mio_extras::channel::Receiver;
 use mio_poll_wrapper::Handle;
-use serde_json::Value;
+use serde_json::{Value, Map};
 use std::collections::HashMap;
 use ChannelUpdate;
 
@@ -72,6 +72,17 @@ impl<TState: Send> ClientState<TState> {
             state: &mut self.state,
             handle,
         };
+
+        if action == "ui.get" {
+            if let Some(ref ui) = self.user_interface {
+                update.reply.push(Value::Object({
+                    let mut map = Map::new();
+                    map.insert("action".to_string(), Value::String("ui.gotten".to_string()));
+                    map.insert("ui".to_string(), Value::String(ui.clone()));
+                    map
+                }));
+            }
+        }
 
         for listener in self.listeners.iter().filter_map(|(k, v)| {
             if ::listening_to(&[k], action) {

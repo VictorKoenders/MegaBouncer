@@ -76,7 +76,6 @@ fn client_all_received(update: &mut ChannelUpdate<ClientState>) {
         update.channel,
         serde_json::to_string(&update.value).unwrap()
     );
-    println!("{}", str);
     update.state.webview.dispatch(move |webview, _| {
         webview.eval(&str);
     });
@@ -96,7 +95,7 @@ fn invoke_cb(webview: &mut WebView<UIState>, arg: &str, userdata: &mut UIState) 
             }
         }
         Some("log") => {
-            let line = iter.collect::<Vec<_>>().join(", ");
+            let line = iter.collect::<Vec<_>>().join(":");
             println!("{}", line);
         }
         Some("emit") => {

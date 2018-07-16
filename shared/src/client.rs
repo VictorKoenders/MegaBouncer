@@ -172,6 +172,9 @@ impl<TState: Send + 'static> Client<TState> {
         for key in keys_to_write {
             self.write(&RegisterListener(key))?;
         }
+        if self.state.user_interface.is_some() {
+            self.write(&RegisterListener(String::from("ui.get")))?;
+        }
 
         self.stream_state = Some(StreamState {
             stream,

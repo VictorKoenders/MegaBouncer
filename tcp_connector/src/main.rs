@@ -17,22 +17,10 @@ fn main() {
     client.register_listener("tcp.listen", listen);
     client.register_listener("tcp.write", write);
     client.register_listener("tcp.status", status);
-    client.register_listener("get_ui", get_ui);
-    client.register_listener("*", print_all);
     client.launch();
 }
 fn print_all(update: &mut ChannelUpdate<State>){
     println!("{:?}", update.value);
-}
-
-fn get_ui(update: &mut ChannelUpdate<State>){
-    println!("Getting UI");
-    update.reply.push(Value::Object({
-        let mut map = Map::new();
-        map.insert("action".to_string(), Value::String("ui_gotten".to_string()));
-        map.insert("ui".to_string(), Value::String("<b>Hello from tcp connector</b>".to_string()));
-        map
-    }));
 }
 
 fn listen(update: &mut ChannelUpdate<State>) {
