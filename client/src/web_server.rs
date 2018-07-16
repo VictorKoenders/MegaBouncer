@@ -11,9 +11,9 @@ use hyper::service::service_fn;
 use self::futures::future;
 
 static NOTFOUND: &[u8] = b"Not Found";
-const INDEX_FILE: &str = "client/ui/index.html";
-const DIST_FILE: &str = "client/ui/dist/bundle.js";
-const DIST_MAP_FILE: &str = "client/ui/dist/bundle.js.map";
+const INDEX_FILE: &str = "ui/index.html";
+const DIST_FILE: &str = "ui/dist/bundle.js";
+const DIST_MAP_FILE: &str = "ui/dist/bundle.js.map";
 
 type ResponseFuture = Box<Future<Item = Response<Body>, Error = io::Error> + Send>;
 

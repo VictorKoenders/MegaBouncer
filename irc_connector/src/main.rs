@@ -11,7 +11,7 @@ fn main() {
     let mut client = shared::client::Client::new("Irc connector", state);
 
     client.on_startup(startup);
-    client.register_user_interface("irc_connector/ui/dist/bundle.js");
+    client.register_user_interface("ui/dist/bundle.js");
     client.register_listener("irc.connect", irc_connect);
     client.register_listener("tcp.received", tcp_received);
     client.register_listener("tcp.status", tcp_status);
