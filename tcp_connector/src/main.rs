@@ -6,7 +6,7 @@ extern crate shared;
 use shared::mio::net::TcpStream;
 use shared::mio::Token;
 use shared::mio_poll_wrapper::Handle;
-use shared::serde_json::{Value, Map};
+use shared::serde_json::Value;
 use shared::ChannelUpdate;
 use std::io::{ErrorKind, Write};
 use std::net::{IpAddr, SocketAddr};
