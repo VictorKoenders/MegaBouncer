@@ -112,7 +112,6 @@ impl<TState: Send + 'static> Client<TState> {
             let obj = value.as_object_mut().unwrap();
             obj.insert(String::from("target"), Value::String(id));
         }
-        println!("{:?}", value);
 
         let buff = ::serde_json::to_vec(&value)
             .map_err(|e| format!("Could not convert object to json string: {:?}", e))?;

@@ -7,4 +7,5 @@ members = [
 	"launcher",
 	"irc_connector",
 	"tcp_connector",
+	"libs/mio-child-process",
 ]

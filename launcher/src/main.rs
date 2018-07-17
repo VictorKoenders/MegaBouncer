@@ -129,6 +129,8 @@ fn handle_child_update(module: &mut RunningModule, poll: &Poll) -> ChildProcessU
 
     let command = &module.command.command;
     let module_name = &module.module.name;
+    let mut stdout = &mut module.stdout;
+    let mut stderr = &mut module.stderr;
     let mut process = module.process.as_mut().unwrap();
     loop {
         let result = match process.try_recv() {
@@ -136,23 +138,30 @@ fn handle_child_update(module: &mut RunningModule, poll: &Poll) -> ChildProcessU
             Err(TryRecvError::Empty) => break,
             Err(TryRecvError::Disconnected) => panic!("Could not receive from process"),
         };
-        if let ProcessEvent::Data(e, str) = &result {
-            if let StdioChannel::Stderr = e {
-                if command == "cargo run" && str.contains("[unoptimized + debuginfo] target(s) in")
-                {
-                    update.did_finish = true;
-                }
-            }
-        }
         match result {
             ProcessEvent::Data(StdioChannel::Stdout, msg) => {
-                println!("[{} stdout] {}", module_name, msg);
+                *stdout += &msg;
+                while let Some(i) = stdout.find('\n') {
+                    println!("[{} stdout] {}", module_name, &stdout[..i]);
+                    stdout.drain(..i+1);
+                }
             }
             ProcessEvent::Data(StdioChannel::Stderr, msg) => {
-                println!("[{} stdout] {}", module_name, msg);
+                *stderr += &msg;
+                while let Some(i) = stderr.find('\n') {
+                    {
+                        let line = &stderr[..i];
+                        if command == "cargo run" && line.starts_with("    Finished dev [unoptimized + debuginfo] target(s) in ")
+                        {
+                            update.did_finish = true;
+                        }
+                        println!("[{} stderr] {}", module_name, &stderr[..i]);
+                    }
+                    stderr.drain(..i+1);
+                }
             }
             ProcessEvent::Exit(exit_status) => {
-                println!("[{}] finished ({:?})", module_name, exit_status);
+                println!("{} finished ({:?})", module_name, exit_status);
                 poll.deregister(process);
                 update.did_finish = true;
                 update.should_remove = true;
@@ -217,14 +226,12 @@ fn start_task(modules: &mut [Rc<RefCell<RunningModule>>], poll: &Poll) {
             if !module_ref.command.directory.is_empty() {
                 dir.push(&module_ref.command.directory);
             }
-            println!();
-            println!("Building {}", module_ref.module.name);
+            print!("Building {}", module_ref.module.name);
             println!(
-                "in {}, running {:?}",
+                ", running {:?} in ./{}/",
+                module_ref.command.command,
                 dir.to_str().unwrap(),
-                module_ref.command.command
             );
-            println!();
             let mut command = module_ref.command.command.split(' ');
             let mut process = Process::new(command.next().unwrap());
             process.current_dir(dir);
@@ -253,6 +260,8 @@ pub struct RunningModule<'a> {
     reverse_dependant_upon: Vec<Rc<RefCell<RunningModule<'a>>>>,
     should_build: bool,
     process: Option<ChildProcess>,
+    stdout: String,
+    stderr: String,
 }
 
 impl<'a> RunningModule<'a> {
@@ -265,6 +274,8 @@ impl<'a> RunningModule<'a> {
             reverse_dependant_upon: Vec::new(),
             should_build: true,
             process: None,
+            stdout: String::new(),
+            stderr: String::new(),
         }
     }
 }

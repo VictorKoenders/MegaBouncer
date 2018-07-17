@@ -5,7 +5,7 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
 shared = { path = "../shared" }
-mio-child-process = "*"
+mio-child-process = { path = "../libs/mio-child-process" }
 mio = "*"
 serde = "*"
 serde_derive = "*"

@@ -1,3 +1,7 @@
 [submodule "mio-poll-wrapper"]
 	path = libs/mio-poll-wrapper
 	url = https://github.com/trangar/mio-poll-wrapper
+
+[submodule "mio-child-process"]
+	path = libs/mio-child-process
+	url = https://github.com/trangar/mio-child-process
