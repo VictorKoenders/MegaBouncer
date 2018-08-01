@@ -3,9 +3,17 @@ members = [
 	"shared",
 	"server",
 	"client",
+	"client/ui",
 	"test_tool",
 	"launcher",
+	"launcher/ui",
 	"irc_connector",
+	"irc_connector/ui",
 	"tcp_connector",
 	"libs/mio-child-process",
+	"libs/mio-poll-wrapper",
+	"libs/cookie-rs",
 ]
+
+[replace]
+"cookie:0.10.1" = { path = "libs/cookie-rs" }

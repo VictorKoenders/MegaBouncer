@@ -8,6 +8,7 @@ extern crate serde;
 extern crate serde_json;
 
 mod module;
+mod server;
 
 use mio::{Events, Poll, PollOpt, Ready, Token};
 use mio_child_process::{CommandAsync, Process as ChildProcess, ProcessEvent, StdioChannel};
@@ -17,8 +18,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as Process, Stdio};
 use std::rc::Rc;
 use std::sync::mpsc::TryRecvError;
+use std::thread::spawn;
 
 fn main() {
+    spawn(server::run);
     let mut arg = std::env::args();
     arg.next();
     let mut programs = arg.collect::<Vec<_>>();
@@ -77,7 +80,15 @@ fn main() {
 
     for (index, module) in modules.iter().enumerate() {
         let mut module_ref = module.borrow_mut();
-        for dependant in &module_ref.module.dependant_upon {
+        for dependant in &module_ref.command.dependant_upon {
+            let (dependant_module, dependant_command) = {
+                let split = dependant.split(':').collect::<Vec<&str>>();
+                if split.len() == 2 {
+                    (split[0], Some(split[1]))
+                } else {
+                    (split[0], None)
+                }
+            };
             let other = {
                 let mut range = modules[..index].iter().chain(modules[index + 1..].iter());
                 range

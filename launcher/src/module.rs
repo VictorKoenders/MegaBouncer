@@ -8,7 +8,6 @@ pub struct Module {
     pub name: String,
     pub path: String,
     pub commands: Vec<Command>,
-    pub dependant_upon: Vec<String>,
 }
 
 impl Module {
@@ -52,8 +51,7 @@ impl Module {
                 Module {
                     name: file_name.to_string(),
                     path: file_name.to_string(),
-                    commands: Command::get_suggested_commands(file_name),
-                    dependant_upon,
+                    commands: Command::get_suggested_commands(file_name, &dependant_upon),
                 }
             };
             result.push(module);
@@ -69,11 +67,11 @@ pub struct Command {
     pub filter: String,
     pub command: String,
     pub directory: String,
-    pub trigger_command_after_done: Option<String>,
+    pub dependant_upon: Vec<String>,
 }
 
 impl Command {
-    pub fn get_suggested_commands(path: &str) -> Vec<Command> {
+    pub fn get_suggested_commands(path: &str, dependant_upon: &[String]) -> Vec<Command> {
         let path = Path::new(path);
         let mut result = Vec::new();
         if path.join("Cargo.toml").exists() {
@@ -86,7 +84,7 @@ impl Command {
                     String::from("cargo build")
                 },
                 directory: String::from(""),
-                trigger_command_after_done: None,
+                dependant_upon: dependant_upon.to_vec(),
             });
         }
         if path.join("ui").join("package.json").exists() {
@@ -96,10 +94,12 @@ impl Command {
                 filter: String::from("*.js,*.tsx,*.ts"),
                 command: String::from("webpack.cmd"),
                 directory: String::from("ui"),
-                trigger_command_after_done: if has_rust {
-                    Some(String::from("rust"))
-                } else {
-                    None
+                dependant_upon: {
+                    let mut d = dependant_upon.to_vec();
+                    if has_rust {
+                        d.push(format!("{}:rust", path.to_str().unwrap()));
+                    }
+                    d
                 },
             });
         }

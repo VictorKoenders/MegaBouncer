@@ -1,10 +1,11 @@
-// #![windows_subsystem = "windows"]
 #![allow(deprecated)]
 
-extern crate hyper;
+extern crate actix;
+extern crate actix_web;
 extern crate serde_json;
 extern crate shared;
 extern crate web_view;
+extern crate futures;
 
 mod web_server;
 // mod client;

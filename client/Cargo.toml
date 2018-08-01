@@ -8,8 +8,6 @@ web-view = { git = "https://github.com/VictorKoenders/web-view", rev = "626df792
 urlencoding = "*"
 serde_json = "*"
 shared = { path = "../shared" }
-hyper = "*"
-futures = "*"
-tokio-fs = "*"
-tokio-io = "*"
-
+actix = "*"
+actix-web = "*"
+futures = "0.1"
