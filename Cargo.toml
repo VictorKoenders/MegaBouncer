@@ -12,8 +12,8 @@ members = [
 	"tcp_connector",
 	"libs/mio-child-process",
 	"libs/mio-poll-wrapper",
-	"libs/cookie-rs",
+	"libs/yew",
 ]
 
 [replace]
-"cookie:0.10.1" = { path = "libs/cookie-rs" }
+"yew:0.4.0" = { path = "libs/yew" }

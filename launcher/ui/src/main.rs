@@ -134,3 +134,12 @@ fn main() {
     app.mount_to_body();
     yew::run_loop();
 }
+
+pub struct State {
+
+}
+
+#[no_mangle]
+pub extern "C" fn test(state: &mut State) {
+    println!("Hello from test");
+}

@@ -1,14 +1,21 @@
 [package]
+authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 name = "launcher"
 version = "0.1.0"
-authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
-shared = { path = "../shared" }
-mio-child-process = { path = "../libs/mio-child-process" }
+actix = "*"
+actix-web = "*"
 mio = "*"
+mio-extras = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
-actix-web = "*"
-actix = "*"
+sysinfo = "*"
+lazy_static = "*"
+
+[dependencies.mio-child-process]
+path = "../libs/mio-child-process"
+
+[dependencies.shared]
+path = "../shared"
