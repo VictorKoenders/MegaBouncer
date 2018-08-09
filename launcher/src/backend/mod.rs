@@ -10,13 +10,16 @@ use mio::{Events, PollOpt, Ready, Token};
 use mio_extras::channel::channel;
 use state::State;
 use std::fs;
+use std::path::PathBuf;
 use std::sync::mpsc::TryRecvError;
 use Result;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum BackendRequest {
-    StartBuild { project_name: String, build_name: String },
+    StartBuild {
+        project_name: String,
+        build_name: String,
+    },
 }
 
 pub fn run(base_dir: &str) -> Result<()> {
@@ -49,7 +52,10 @@ pub fn run(base_dir: &str) -> Result<()> {
                         }
                     };
                     match request {
-                        BackendRequest::StartBuild { project_name, build_name } => {
+                        BackendRequest::StartBuild {
+                            project_name,
+                            build_name,
+                        } => {
                             if let Err(e) = backend.start_build(project_name, build_name) {
                                 State::report_error(e);
                             }
@@ -71,12 +77,14 @@ pub fn run(base_dir: &str) -> Result<()> {
                         {
                             match follow_up {
                                 PostBuildEvent::Run(run_type) => {
-                                    let project_name = backend.running_builds[index].project_name.clone();
+                                    let project_name =
+                                        backend.running_builds[index].project_name.clone();
                                     let build = backend.running_builds[index].build.clone();
                                     start_process = Some((project_name, build, run_type.clone()));
                                 }
                                 PostBuildEvent::TriggerBuild { name } => {
-                                    let project_name = backend.running_builds[index].project_name.clone();
+                                    let project_name =
+                                        backend.running_builds[index].project_name.clone();
                                     start_build = Some((project_name, name.clone()));
                                 }
                             }
@@ -125,7 +133,7 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
     let mut path_buf = dir.to_path_buf();
     let project_name = match dir.file_name().and_then(|s| s.to_str()) {
         Some(f) => f,
-        None => return Ok(None)
+        None => return Ok(None),
     };
     let mut result = Project {
         name: project_name.to_string(),
@@ -139,7 +147,7 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
             directory: path_buf.to_string_lossy().to_string(),
             pattern: String::new(),
             build: BuildType::Cargo,
-            after_success: Some(PostBuildEvent::Run(RunType::Cargo))
+            after_success: Some(PostBuildEvent::Run(RunType::Cargo)),
         });
     } else {
         path_buf.pop();
@@ -152,7 +160,13 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
             directory: path_buf.to_string_lossy().to_string(),
             pattern: String::new(),
             build: BuildType::TypescriptReactWebpack,
-            after_success: Some(PostBuildEvent::TriggerBuild { name: String::from("cargo") }),
+            after_success: if project_name != "launcher" {
+                Some(PostBuildEvent::TriggerBuild {
+                    name: String::from("cargo"),
+                })
+            } else {
+                None
+            },
         });
     }
 
@@ -166,7 +180,9 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
 fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
     let mut result = Vec::new();
     for dir in fs::read_dir(base_dir)?.filter_map(|d| d.ok()) {
-        if !dir.path().is_dir() { continue; }
+        if !dir.path().is_dir() {
+            continue;
+        }
         let name = dir.file_name();
         let name = match name.to_str() {
             Some(n) => n,

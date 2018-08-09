@@ -1,3 +1,4 @@
+use actix_web::fs::NamedFile;
 use actix_web::{server, App, HttpRequest, Responder};
 use backend::BackendRequest;
 use chrono::Utc;
@@ -33,14 +34,29 @@ fn status(_req: &HttpRequest) -> impl Responder {
     result
 }
 
+fn index(_req: &HttpRequest) -> impl Responder {
+    NamedFile::open("ui/index.html")
+}
+
+fn bundle(_req: &HttpRequest) -> impl Responder {
+    NamedFile::open("ui/dist/bundle.js")
+}
+
+fn bundle_map(_req: &HttpRequest) -> impl Responder {
+    NamedFile::open("ui/dist/bundle.js.map")
+}
+
 pub fn run() {
     server::new(|| {
         App::new()
-            .resource("/", |r| r.f(status))
+            .resource("/", |r| r.f(index))
+            .resource("/bundle.js", |r| r.f(bundle))
+            .resource("/bundle.js.map", |r| r.f(bundle_map))
+            .resource("/api/state", |r| r.f(status))
             .resource("/api/build/start/{project_name}/{build_name}", |r| {
                 r.f(trigger_build)
             })
     }).bind("127.0.0.1:8000")
-        .expect("Can not bind to port 8000")
-        .run();
+    .expect("Can not bind to port 8000")
+    .run();
 }
