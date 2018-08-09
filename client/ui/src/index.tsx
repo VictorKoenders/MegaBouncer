@@ -3,20 +3,11 @@ import * as ReactDOM from "react-dom";
 
 import { Root } from "./components/Root";
 declare global {
-  interface Window {
-    message_received: (message: string, value: any) => void;
-    modules: { [name: string]: any };
-  }
-  interface External {
-    invoke: (n: string) => void;
-  }
   interface Array<T> {
     find(cb: (t: T, i: number, arr: Array<T>) => boolean): T | null;
     findIndex(cb: (t: T, i: number, arr: Array<T>) => boolean): number | null;
   }
 }
-
-window.modules = {};
 
 if (!Array.prototype.find) {
   Object.defineProperty(Array.prototype, "find", {

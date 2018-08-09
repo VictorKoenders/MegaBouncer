@@ -141,9 +141,10 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
             build: BuildType::Cargo,
             after_success: Some(PostBuildEvent::Run(RunType::Cargo))
         });
+    } else {
+        path_buf.pop();
     }
 
-    path_buf.pop();
     path_buf.push("ui");
     if path_buf.exists() {
         result.builds.push(Build {

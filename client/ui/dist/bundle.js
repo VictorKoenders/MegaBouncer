@@ -123,7 +123,7 @@ var Root = /** @class */ (function (_super) {
     __extends(Root, _super);
     function Root(props, context) {
         var _this = _super.call(this, props, context) || this;
-        window.message_received = _this.message_received.bind(_this);
+        // window.message_received = this.message_received.bind(this);
         _this.state = {
             logs: [],
             modules: [],
@@ -170,17 +170,20 @@ var Root = /** @class */ (function (_super) {
     Root.prototype.render_content = function () {
         if (this.state.active == null)
             return null;
-        if (!window.modules.hasOwnProperty(this.state.active.name)) {
-            return (React.createElement(React.Fragment, null,
-                React.createElement("b", null,
-                    "Module ",
-                    this.state.active.name,
-                    " is not found in the list:"),
-                React.createElement("br", null),
-                React.createElement("ul", null, Object.keys(window.modules).map(function (m, i) { return React.createElement("li", { key: i }, m); }))));
+        /*if (!window.modules.hasOwnProperty(this.state.active.name)) {
+          return (
+            <>
+              <b>Module {this.state.active.name} is not found in the list:</b>
+              <br />
+              <ul>
+                {Object.keys(window.modules).map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </>
+          );
         }
-        var Connector = window.modules[this.state.active.name];
-        return React.createElement(Connector, null);
+        let Connector = window.modules[this.state.active.name];
+        return <Connector />;*/
+        return null;
     };
     Root.prototype.render = function () {
         return (React.createElement(React.Fragment, null,
@@ -206,13 +209,13 @@ exports.Root = Root;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var node_listed_1 = __webpack_require__(/*! ./node.listed */ "./src/handler/node.listed.ts");
 function default_1(state, obj) {
     var module = state.modules.find(function (m) { return m.id == obj.sender_id; });
     if (!module)
         return;
     if (obj.channel == "ui.get") {
-        external.invoke(node_listed_1.get_emit(obj.sender_id));
+        console.log("Emitting", obj.sender_id);
+        // external.invoke(request_ui_emit(obj.sender_id));
     }
 }
 exports.default = default_1;
@@ -233,9 +236,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 function default_1(state, obj) {
     var index = state.modules.findIndex(function (m) { return m.id == obj.id; });
     if (index >= 0) {
-        if (window.modules.hasOwnProperty(state.modules[index].name)) {
+        /*if(window.modules.hasOwnProperty(state.modules[index].name)) {
             delete window.modules[state.modules[index].name];
-        }
+        }*/
         state.modules.splice(index, 1);
     }
 }
@@ -298,7 +301,8 @@ function default_1(new_state, obj) {
                 ui_loaded: false
             });
             var emit = get_emit(node.id);
-            external.invoke(emit);
+            console.log("Emitting", emit);
+            //external.invoke(emit);
         }
     }
 }
@@ -345,7 +349,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var React = __webpack_require__(/*! react */ "react");
 var ReactDOM = __webpack_require__(/*! react-dom */ "react-dom");
 var Root_1 = __webpack_require__(/*! ./components/Root */ "./src/components/Root.tsx");
-window.modules = {};
 if (!Array.prototype.find) {
     Object.defineProperty(Array.prototype, "find", {
         value: function (predicate) {

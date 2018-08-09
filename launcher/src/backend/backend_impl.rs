@@ -91,11 +91,9 @@ impl Backend {
         run: RunType,
     ) -> Result<()> {
         println!("Starting {}::{} {:?}", project_name, build.name, run);
-        while let Some(index) = self
-            .running_processes
-            .iter()
-            .position(|p| p.project_name == project_name && p.run_type == run)
-        {
+        while let Some(index) = self.running_processes.iter().position(|p| {
+            p.project_name == project_name && p.build.name == build.name && p.run_type == run
+        }) {
             let mut process = self.running_processes.remove(index);
             let id = process.process.id();
             println!("Killing pid {}", id);
@@ -244,9 +242,7 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
-                                state.finished_builds.push(process);
+                                state.running_processes.remove(index);
                                 finished = true;
                             }
                             ProcessEvent::IoError(_, e) => {
@@ -254,9 +250,7 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
-                                state.finished_builds.push(process);
+                                state.running_processes.remove(index);
                                 finished = true;
                             }
                             ProcessEvent::Utf8Error(_, e) => {
@@ -264,16 +258,11 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
-                                state.finished_builds.push(process);
+                                state.running_processes.remove(index);
                                 finished = true;
                             }
                             ProcessEvent::Exit(status) => {
-                                let mut process = state.running_builds.remove(index);
-                                process.status =
-                                    StateProcessState::Success(status.code().unwrap_or(0));
-                                state.finished_builds.push(process);
+                                state.running_processes.remove(index);
                                 finished = true;
                                 finished_succesfully = status.success();
                             }

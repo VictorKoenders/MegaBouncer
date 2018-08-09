@@ -33,7 +33,6 @@ pub struct Module {
 
 fn main() {
     let url = web_server::serve();
-    println!("Requesting {:?}", url);
     let (_result_userdata, success) = run(
         "Megabouncer",
         Content::Url(url),

@@ -256,13 +256,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client_ui"
-version = "0.1.0"
-dependencies = [
- "yew 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -629,13 +622,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "irc_connector_ui"
-version = "0.1.0"
-dependencies = [
- "yew 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "itoa"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -672,16 +658,6 @@ dependencies = [
  "serde_json 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "shared 0.1.0",
  "sysinfo 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "launcher_ui"
-version = "0.1.0"
-dependencies = [
- "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "stdweb 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "yew 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1804,12 +1780,6 @@ dependencies = [
  "toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
-[[package]]
-name = "yew"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-replace = "yew 0.4.0"
-
 [metadata]
 "checksum actix 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ce3cde6db6c8f7a3baa14614d634c06743ba64361f360919e3a9c697a1432098"
 "checksum actix-web 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2b79aac53ea4922b114768413037f2d75d4ab039646bbf700ce152bb2678b6eb"
@@ -2003,4 +1973,3 @@ replace = "yew 0.4.0"
 "checksum winutil 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7daf138b6b14196e3830a588acf1e86966c694d3e8fb026fb105b8b5dca07e6e"
 "checksum ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 "checksum yaml-rust 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "57ab38ee1a4a266ed033496cf9af1828d8d6e6c1cfa5f643a2809effcae4d628"
-"checksum yew 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "078bc9860a9c72d3ff40b19fc7ed0a21c69234c667cd859091a72e513143cd9e"

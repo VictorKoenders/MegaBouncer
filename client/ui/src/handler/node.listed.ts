@@ -29,7 +29,8 @@ export default function(new_state: RootState, obj: NodeListAction) {
         ui_loaded: false
       });
       let emit = get_emit(node.id);
-      external.invoke(emit);
+      console.log("Emitting", emit);
+      //external.invoke(emit);
     }
   }
 }

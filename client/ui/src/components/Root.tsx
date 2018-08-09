@@ -21,7 +21,7 @@ const handlers: {
 export class Root extends React.Component<{}, RootState> {
   constructor(props: {}, context?: any) {
     super(props, context);
-    window.message_received = this.message_received.bind(this);
+    // window.message_received = this.message_received.bind(this);
     this.state = {
       logs: [],
       modules: [],
@@ -70,7 +70,7 @@ export class Root extends React.Component<{}, RootState> {
   }
   render_content(): JSX.Element | null {
     if (this.state.active == null) return null;
-    if (!window.modules.hasOwnProperty(this.state.active.name)) {
+    /*if (!window.modules.hasOwnProperty(this.state.active.name)) {
       return (
         <>
           <b>Module {this.state.active.name} is not found in the list:</b>
@@ -82,7 +82,8 @@ export class Root extends React.Component<{}, RootState> {
       );
     }
     let Connector = window.modules[this.state.active.name];
-    return <Connector />;
+    return <Connector />;*/
+    return null;
   }
   render() {
     return (

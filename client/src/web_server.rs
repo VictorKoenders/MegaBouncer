@@ -41,20 +41,24 @@ fn bundle_map(_req: &HttpRequest) -> Result<NamedFile> {
 
 pub fn serve() -> String {
     let mut system = ::actix::System::new("MegaBouncer client");
+    let (sender, receiver) = ::std::sync::mpsc::channel();
 
-    let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
-    let server = ::actix_web::server::new(|| {
-        App::new()
-            .resource("/", |r| r.method(Method::GET).f(index))
-            .resource("/bundle.js", |r| r.method(Method::GET).f(bundle))
-            .resource("/bundle.js.map", |r| r.method(Method::GET).f(bundle_map))
-            .resource("/ws/", |r| r.f(|req| ws::start(req, Ws)))
-    }).bind(addr)
-        .unwrap();
-    let addr = server.addrs()[0];
-    let url = format!("http://{}", addr);
-
-    server.run();
+    spawn(move || {
+        let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 0).into();
+        let server = ::actix_web::server::new(|| {
+            App::new()
+                .resource("/", |r| r.method(Method::GET).f(index))
+                .resource("/bundle.js", |r| r.method(Method::GET).f(bundle))
+                .resource("/bundle.js.map", |r| r.method(Method::GET).f(bundle_map))
+                .resource("/ws/", |r| r.f(|req| ws::start(req, Ws)))
+        }).bind(addr)
+            .unwrap();
+        let addr = server.addrs()[0];
+        let url = format!("http://{}", addr);
+        sender.send((addr, url)).unwrap();
+        server.run();
+    });
+    let (addr, url) = receiver.recv().unwrap();
     println!("Server listening on {}", addr);
     while !server_is_up(&mut system, url.clone()) {
         sleep_ms(1000);

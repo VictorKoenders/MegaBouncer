@@ -33,7 +33,7 @@ impl BuildType {
             }
             BuildType::TypescriptReactWebpack => {
                 let mut c = Command::new("node");
-                c.arg("../../node_modules/webpack_cli/bin/cli.js");
+                c.arg("node_modules/webpack-cli/bin/cli.js");
                 c
             }
             BuildType::Custom { command, args } => {

@@ -3,17 +3,11 @@ members = [
 	"shared",
 	"server",
 	"client",
-	"client/ui",
 	"test_tool",
 	"launcher",
-	"launcher/ui",
 	"irc_connector",
-	"irc_connector/ui",
 	"tcp_connector",
 	"libs/mio-child-process",
 	"libs/mio-poll-wrapper",
 	"libs/yew",
 ]
-
-[replace]
-"yew:0.4.0" = { path = "libs/yew" }

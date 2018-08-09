@@ -9,6 +9,7 @@ export default function(state: RootState, obj: ChannelRegisteredAction) {
     const module = state.modules.find(m => m.id == obj.sender_id);
     if(!module) return;
     if(obj.channel == "ui.get") {
-        external.invoke(request_ui_emit(obj.sender_id));
+        console.log("Emitting", obj.sender_id);
+        // external.invoke(request_ui_emit(obj.sender_id));
     }
 }
