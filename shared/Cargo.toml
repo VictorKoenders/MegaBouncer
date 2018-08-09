@@ -1,0 +1,11 @@
+[package]
+name = "shared"
+version = "0.1.0"
+authors = ["Victor Koenders <victor.koenders@gmail.com>"]
+
+[dependencies]
+serde = "*"
+serde_json = "*"
+mio = "*"
+mio-extras = "*"
+mio-poll-wrapper = { path = "../libs/mio-poll-wrapper" }

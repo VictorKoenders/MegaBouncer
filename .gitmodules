@@ -1,18 +1,11 @@
-[submodule "IrcConnector"]
-	path = IrcConnector
-	url = http://github.com/megabouncer/IrcConnector
-[submodule "prometheus_scraper"]
-	path = prometheus_scraper
-	url = https://github.com/MegaBouncer/prometheus_scraper
-[submodule "TcpConnector"]
-	path = TcpConnector
-	url = http://github.com/megabouncer/TcpConnector
-[submodule "DataStore"]
-	path = DataStore
-	url = http://github.com/megabouncer/DataStore
-[submodule "libs/shared"]
-	path = libs/shared
-	url = http://github.com/megabouncer/RustShared
-[submodule "Server"]
-	path = Server
-	url = http://github.com/megabouncer/Server
+[submodule "mio-poll-wrapper"]
+	path = libs/mio-poll-wrapper
+	url = https://github.com/trangar/mio-poll-wrapper
+
+[submodule "mio-child-process"]
+	path = libs/mio-child-process
+	url = https://github.com/trangar/mio-child-process
+[submodule "libs/yew"]
+	path = libs/yew
+	url = http://github.com/victorkoenders/yew
+	branch = websocketservice_debug

@@ -1,0 +1,13 @@
+[workspace]
+members = [
+	"shared",
+	"server",
+	"client",
+	"test_tool",
+	"launcher",
+	"irc_connector",
+	"tcp_connector",
+	"libs/mio-child-process",
+	"libs/mio-poll-wrapper",
+	"libs/yew",
+]

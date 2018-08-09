@@ -1,3 +1,4 @@
 target
-config.toml
-/test
+**/*.rs.bk
+.vscode
+node_modules
