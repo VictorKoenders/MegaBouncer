@@ -15,6 +15,7 @@ extern crate mio_extras;
 extern crate shared;
 #[macro_use]
 extern crate failure;
+extern crate uuid;
 
 mod backend;
 mod server;
@@ -34,8 +35,7 @@ fn main() {
                 .help("Set the base directory of the projects")
                 .required(true)
                 .takes_value(true),
-        )
-        .get_matches();
+        ).get_matches();
 
     spawn(server::run);
     if let Err(e) = backend::run(matches.value_of("base_dir").unwrap()) {

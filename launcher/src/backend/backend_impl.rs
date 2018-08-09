@@ -1,15 +1,21 @@
-use super::{Build, ProcessResult, Project, RunType, RunningBuild, RunningProcess};
+use super::{
+    Build, ProcessResult, Project, RunType, RunningBuild as BackendRunningBuild,
+    RunningProcess as BackendRunningProcess,
+};
 use chrono::Utc;
 use mio::{Poll, PollOpt, Ready, Token};
 use mio_child_process::{ProcessEvent, StdioChannel};
-use state::{State, StateBuildProcess, StateError, StateProcess, StateProcessState};
+use state::{
+    FinishedBuild as StateFinishedBuild, RunningBuild as StateRunningBuild,
+    RunningProcess as StateRunningProcess, State, StateError,
+};
 use std::sync::mpsc::TryRecvError;
 use Result;
 
 pub struct Backend {
     pub projects: Vec<Project>,
-    pub running_builds: Vec<RunningBuild>,
-    pub running_processes: Vec<RunningProcess>,
+    pub running_builds: Vec<BackendRunningBuild>,
+    pub running_processes: Vec<BackendRunningProcess>,
     pub poll: Poll,
     next_token: usize,
 }
@@ -24,6 +30,19 @@ impl Backend {
             next_token: 10,
             poll,
         })
+    }
+
+    pub fn kill_process(&mut self, pid: u32) -> Result<()> {
+        if let Some(index) = self.running_processes.iter().position(|p| p.process.id() == pid) {
+            State::modify(|state| {
+                if let Some(index) = state.running_processes.iter().position(|p| p.id == pid) {
+                    state.running_processes.remove(index);
+                }
+            });
+            let mut process = self.running_processes.remove(index);
+            process.process.kill()?;
+        }
+        Ok(())
     }
 
     pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
@@ -61,7 +80,8 @@ impl Backend {
 
             let token = Token(self.next_token);
             self.next_token += 1;
-            let mut running_build = RunningBuild::new(project_name.clone(), build.clone(), token)?;
+            let mut running_build =
+                BackendRunningBuild::new(project_name.clone(), build.clone(), token)?;
             let id = running_build.process.id();
 
             if let Err(e) =
@@ -72,7 +92,7 @@ impl Backend {
                 bail!("Could not spawn {}::{}: {:?}", project_name, build.name, e);
             }
             State::modify(|s| {
-                s.running_builds.push(StateBuildProcess::new(
+                s.running_builds.push(StateRunningBuild::new(
                     project_name.clone(),
                     build.name.clone(),
                     id,
@@ -105,7 +125,7 @@ impl Backend {
 
         let token = Token(self.next_token);
         let mut running_process =
-            RunningProcess::new(project_name.clone(), build.clone(), run.clone(), token)?;
+            BackendRunningProcess::new(project_name.clone(), build.clone(), run.clone(), token)?;
         self.next_token += 1;
         let id = running_process.process.id();
         if let Err(e) = self.poll.register(
@@ -126,7 +146,7 @@ impl Backend {
         self.running_processes.push(running_process);
         State::modify(|s| {
             s.running_processes
-                .push(StateProcess::new(project_name, run, id));
+                .push(StateRunningProcess::new(project_name, run, id));
         });
 
         Ok(())
@@ -158,8 +178,12 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
+                                let mut process: StateFinishedBuild =
+                                    state.running_builds.remove(index).into();
+                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
+                                // https://github.com/rust-lang/rust/issues/24135
+                                // https://github.com/rust-lang-nursery/failure/issues/148
+                                // process.error = Some(e);
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
@@ -168,8 +192,12 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
+                                let mut process: StateFinishedBuild =
+                                    state.running_builds.remove(index).into();
+                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
+                                // https://github.com/rust-lang/rust/issues/24135
+                                // https://github.com/rust-lang-nursery/failure/issues/148
+                                // process.error = Some(e);
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
@@ -178,16 +206,20 @@ impl Backend {
                                     time: Utc::now(),
                                     error: e.into(),
                                 });
-                                let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Failed;
+                                let mut process: StateFinishedBuild =
+                                    state.running_builds.remove(index).into();
+                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
+                                // https://github.com/rust-lang/rust/issues/24135
+                                // https://github.com/rust-lang-nursery/failure/issues/148
+                                // process.error = Some(e);
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
                             ProcessEvent::Exit(status) => {
-                                let mut process = state.running_builds.remove(index);
-                                process.status =
-                                    StateProcessState::Success(status.code().unwrap_or(0));
-                                state.finished_builds.push(process);
+                                let mut process: StateFinishedBuild =
+                                    state.running_builds.remove(index).into();
+                                process.status = status.code().unwrap_or(0);
+                                state.finished_builds.insert(0, process);
                                 finished = true;
                                 finished_succesfully = status.success();
                             }
@@ -205,8 +237,8 @@ impl Backend {
                     let id = self.running_builds[index].process.id();
                     State::modify(|state| {
                         if let Some(index) = state.running_builds.iter().position(|p| p.id == id) {
-                            let mut process = state.running_builds.remove(index);
-                            process.status = StateProcessState::Failed;
+                            let process: StateFinishedBuild =
+                                state.running_builds.remove(index).into();
                             state.finished_builds.push(process);
                         }
                     });
@@ -280,8 +312,7 @@ impl Backend {
                     let id = self.running_builds[index].process.id();
                     State::modify(|state| {
                         if let Some(index) = state.running_builds.iter().position(|p| p.id == id) {
-                            let mut process = state.running_builds.remove(index);
-                            process.status = StateProcessState::Failed;
+                            let process = state.running_builds.remove(index).into();
                             state.finished_builds.push(process);
                         }
                     });

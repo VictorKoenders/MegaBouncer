@@ -1,12 +1,14 @@
 use super::{Build, RunType};
-use mio_child_process::{Process, CommandAsync};
+use chrono::{DateTime, Utc};
 use mio::Token;
+use mio_child_process::{CommandAsync, Process};
 use std::process::Stdio;
 use Result;
 
 pub struct RunningBuild {
     pub project_name: String,
     pub build: Build,
+    pub started_on: DateTime<Utc>,
     pub token: Token,
     pub process: Process,
 }
@@ -22,6 +24,7 @@ impl RunningBuild {
         Ok(RunningBuild {
             project_name,
             build,
+            started_on: Utc::now(),
             token,
             process,
         })
@@ -37,7 +40,12 @@ pub struct RunningProcess {
 }
 
 impl RunningProcess {
-    pub fn new(project_name: String, build: Build, run_type: RunType, token: Token) -> Result<RunningProcess> {
+    pub fn new(
+        project_name: String,
+        build: Build,
+        run_type: RunType,
+        token: Token,
+    ) -> Result<RunningProcess> {
         let mut command = run_type.create_command();
         command.current_dir(&build.directory);
         command.stdout(Stdio::piped());

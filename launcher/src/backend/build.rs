@@ -20,7 +20,10 @@ pub enum BuildType {
     Cargo,
     TypescriptReactWebpack,
     #[allow(dead_code)]
-    Custom { command: String, args: Vec<String> },
+    Custom {
+        command: String,
+        args: Vec<String>,
+    },
 }
 
 impl BuildType {
@@ -55,7 +58,10 @@ pub enum PostBuildEvent {
 pub enum RunType {
     Cargo,
     #[allow(dead_code)]
-    Custom { command: String, args: Vec<String> },
+    Custom {
+        command: String,
+        args: Vec<String>,
+    },
 }
 
 impl RunType {

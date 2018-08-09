@@ -113,6 +113,7 @@ var Root = /** @class */ (function (_super) {
         var _this = _super.call(this, props, context) || this;
         _this.state = {
             state: null,
+            open_uuids: [],
         };
         return _this;
     }
@@ -130,26 +131,90 @@ var Root = /** @class */ (function (_super) {
             });
         });
     };
+    Root.prototype.render_time = function (diff) {
+        diff = Math.ceil(diff / 1000);
+        var result = "";
+        if (diff > 3600) {
+            var hours = Math.floor(diff / 3600);
+            diff -= hours * 3600;
+            result += hours + " hours";
+        }
+        if (diff > 60) {
+            if (result)
+                result += ", ";
+            var minutes = Math.floor(diff / 60);
+            diff -= minutes * 60;
+            result += diff + " minutes";
+        }
+        if (diff > 0) {
+            if (result)
+                result += ", ";
+            result += diff + " seconds";
+        }
+        return result;
+    };
     Root.prototype.render_running_build = function (build, index) {
-        return React.createElement("p", { key: index },
-            React.createElement("b", null, build.build),
-            React.createElement("br", null),
+        var start = new Date(build.started_on);
+        var diff = Date.now() - start.getTime();
+        return React.createElement("div", { key: index },
+            React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
+                React.createElement("b", null, build.build),
+                " (running for ",
+                this.render_time(diff),
+                ")"),
             React.createElement("pre", null, build.stdout),
             React.createElement("pre", null, build.stderr));
     };
     Root.prototype.render_finished_build = function (build, index) {
-        return React.createElement("p", { key: index },
-            React.createElement("b", null, build.build),
-            React.createElement("br", null),
-            React.createElement("pre", null, build.stdout),
-            React.createElement("pre", null, build.stderr));
+        var start = new Date(build.started_on);
+        var end = new Date(build.ended_on);
+        var diff = end.getTime() - start.getTime();
+        var is_open = this.state.open_uuids.some(function (u) { return u == build.uuid; });
+        if (is_open) {
+            return React.createElement("div", { key: index },
+                React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
+                    React.createElement("b", null, build.build),
+                    " (finished in ",
+                    this.render_time(diff),
+                    ")"),
+                React.createElement("pre", null, build.stdout),
+                React.createElement("pre", null, build.stderr));
+        }
+        else {
+            return React.createElement("p", { key: index, onClick: this.toggle_open.bind(this, build.uuid) },
+                React.createElement("b", null, build.build),
+                " (finished in ",
+                this.render_time(diff),
+                ")");
+        }
     };
     Root.prototype.render_process = function (process, index) {
-        return React.createElement("p", { key: index },
-            React.createElement("b", null, process.directory),
-            React.createElement("br", null),
-            React.createElement("pre", null, process.stdout),
-            React.createElement("pre", null, process.stderr));
+        var is_open = this.state.open_uuids.some(function (u) { return u == process.uuid; });
+        if (is_open) {
+            return React.createElement("div", { key: index },
+                React.createElement("p", { onClick: this.toggle_open.bind(this, process.uuid) },
+                    React.createElement("b", null, process.directory),
+                    " ",
+                    React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.id) }, "\u00D7")),
+                React.createElement("pre", null, process.stdout),
+                React.createElement("pre", null, process.stderr));
+        }
+        else {
+            return React.createElement("p", { key: index, onClick: this.toggle_open.bind(this, process.uuid) },
+                React.createElement("b", null, process.directory),
+                " ",
+                React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.id) }, "\u00D7"));
+        }
+    };
+    Root.prototype.kill_process = function (id, ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        fetch("/api/kill/" + id).then(function (r) { return r.text(); }).then(function (r) {
+            if (r !== "Ok") {
+                alert("Could not kill process\n" + r);
+            }
+        });
+        return false;
     };
     Root.prototype.render_project = function (project, index) {
         return React.createElement("p", { key: index },
@@ -159,6 +224,22 @@ var Root = /** @class */ (function (_super) {
     };
     Root.prototype.render_build = function (project, build, index) {
         return React.createElement("button", { key: index, onClick: this.start_build.bind(this, project, build) }, build.name);
+    };
+    Root.prototype.toggle_open = function (uuid, ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var uuids = this.state.open_uuids;
+        var index = uuids.findIndex(function (u) { return u == uuid; });
+        if (index !== -1) {
+            uuids.splice(index, 1);
+        }
+        else {
+            uuids.push(uuid);
+        }
+        this.setState({
+            open_uuids: uuids,
+        });
+        return false;
     };
     Root.prototype.start_build = function (project, build, ev) {
         ev.preventDefault();

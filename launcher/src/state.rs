@@ -4,12 +4,13 @@ use failure::Error;
 use mio_extras::channel::{channel, Sender};
 use std::fmt;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 #[derive(Serialize)]
 pub struct State {
-    pub running_builds: Vec<StateBuildProcess>,
-    pub running_processes: Vec<StateProcess>,
-    pub finished_builds: Vec<StateBuildProcess>,
+    pub running_processes: Vec<RunningProcess>,
+    pub running_builds: Vec<RunningBuild>,
+    pub finished_builds: Vec<FinishedBuild>,
     #[serde(skip_serializing)]
     pub sender: Sender<BackendRequest>,
     pub projects: Vec<Project>,
@@ -24,6 +25,13 @@ pub struct StateError {
 }
 
 fn error_to_string<S>(err: &Error, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: ::serde::Serializer,
+{
+    serializer.serialize_str(&format!("{:?}", err))
+}
+
+fn optional_error_to_string<S>(err: &Option<Error>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: ::serde::Serializer,
 {
@@ -80,54 +88,81 @@ impl State {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct StateProcess {
+pub struct RunningProcess {
+    pub uuid: Uuid,
     pub directory: String,
     pub run_type: RunType,
     pub id: u32,
-    pub status: StateProcessState,
     pub stdout: String,
     pub stderr: String,
 }
 
-impl StateProcess {
-    pub fn new(directory: String, run_type: RunType, id: u32) -> StateProcess {
-        StateProcess {
+impl RunningProcess {
+    pub fn new(directory: String, run_type: RunType, id: u32) -> RunningProcess {
+        RunningProcess {
+            uuid: Uuid::new_v4(),
             directory,
             run_type,
             id,
-            status: StateProcessState::Running,
             stdout: String::new(),
             stderr: String::new(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct StateBuildProcess {
+#[derive(Debug, Serialize)]
+pub struct RunningBuild {
+    pub uuid: Uuid,
     pub directory: String,
     pub build: String,
+    pub started_on: DateTime<Utc>,
     pub id: u32,
-    pub status: StateProcessState,
     pub stdout: String,
     pub stderr: String,
 }
 
-impl StateBuildProcess {
-    pub fn new(directory: String, build: String, id: u32) -> StateBuildProcess {
-        StateBuildProcess {
+impl RunningBuild {
+    pub fn new(directory: String, build: String, id: u32) -> RunningBuild {
+        RunningBuild {
+            uuid: Uuid::new_v4(),
             directory,
             build,
+            started_on: Utc::now(),
             id,
-            status: StateProcessState::Running,
             stdout: String::new(),
             stderr: String::new(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub enum StateProcessState {
-    Running,
-    Failed,
-    Success(i32),
+#[derive(Debug, Serialize)]
+pub struct FinishedBuild {
+    pub uuid: Uuid,
+    pub directory: String,
+    pub build: String,
+    pub started_on: DateTime<Utc>,
+    pub ended_on: DateTime<Utc>,
+    pub status: i32,
+    #[serde(serialize_with = "optional_error_to_string")]
+    pub error: Option<::failure::Error>,
+    pub id: u32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl From<RunningBuild> for FinishedBuild {
+    fn from(build: RunningBuild) -> FinishedBuild {
+        FinishedBuild {
+            uuid: build.uuid,
+            directory: build.directory,
+            build: build.build,
+            started_on: build.started_on,
+            ended_on: Utc::now(),
+            status: 0,
+            error: None,
+            id: build.id,
+            stdout: build.stdout,
+            stderr: build.stderr,
+        }
+    }
 }

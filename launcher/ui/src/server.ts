@@ -1,32 +1,33 @@
 declare module server {
 
-    export interface RunningBuild {
-        directory: string;
-        build: string;
-        id: number;
-        status: string;
-        stdout: string;
-        stderr: string;
-    }
-
     export interface RunningProcess {
+        uuid: string;
         directory: string;
         run_type: string;
         id: number;
-        status: string;
         stdout: string;
         stderr: string;
     }
 
-    export interface Status {
-        Success: number;
+    export interface RunningBuild {
+        uuid: string;
+        directory: string;
+        build: string;
+        started_on: string;
+        id: number;
+        stdout: string;
+        stderr: string;
     }
 
     export interface FinishedBuild {
+        uuid: string;
         directory: string;
         build: string;
+        started_on: any;
+        ended_on: string;
+        status: number;
+        error: string;
         id: number;
-        status: Status;
         stdout: string;
         stderr: string;
     }
@@ -59,11 +60,13 @@ declare module server {
     }
 
     export interface State {
-        running_builds: RunningBuild[];
         running_processes: RunningProcess[];
+        running_builds: RunningBuild[];
         finished_builds: FinishedBuild[];
         projects: Project[];
         errors: Error[];
     }
 
 }
+
+

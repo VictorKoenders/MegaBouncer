@@ -3,6 +3,7 @@ use actix_web::{server, App, HttpRequest, Responder};
 use backend::BackendRequest;
 use chrono::Utc;
 use state::{State, StateError};
+use Result;
 
 fn trigger_build(req: &HttpRequest) -> impl Responder {
     let project_name = req.match_info().get("project_name")?.to_string();
@@ -25,6 +26,24 @@ fn trigger_build(req: &HttpRequest) -> impl Responder {
         })
     }
     Some("Ok")
+}
+fn kill(req: &HttpRequest) -> Result<&'static str> {
+    let pid: u32 = req.match_info().get("pid").unwrap_or("").parse()?;
+    let mut error = None;
+    State::get(|state| {
+        if let Err(e) = state.sender.send(BackendRequest::KillProcess(pid)) {
+            error = Some(e);
+        }
+    });
+    if let Some(e) = error {
+        State::modify(|state| {
+            state.errors.push(StateError {
+                time: Utc::now(),
+                error: e.into(),
+            });
+        })
+    }
+    Ok("Ok")
 }
 fn status(_req: &HttpRequest) -> impl Responder {
     let mut result = Ok(String::new());
@@ -53,6 +72,7 @@ pub fn run() {
             .resource("/bundle.js", |r| r.f(bundle))
             .resource("/bundle.js.map", |r| r.f(bundle_map))
             .resource("/api/state", |r| r.f(status))
+            .resource("/api/kill/{pid}", |r| r.f(kill))
             .resource("/api/build/start/{project_name}/{build_name}", |r| {
                 r.f(trigger_build)
             })
