@@ -2,17 +2,19 @@
 authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 name = "launcher"
 version = "0.1.0"
-
 [dependencies]
 actix = "*"
 actix-web = "*"
+chrono = "*"
+clap = "*"
+failure = "*"
+lazy_static = "*"
 mio = "*"
 mio-extras = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
 sysinfo = "*"
-lazy_static = "*"
 
 [dependencies.mio-child-process]
 path = "../libs/mio-child-process"
