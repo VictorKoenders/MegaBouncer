@@ -1,12 +1,12 @@
 use std::process::Command;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Project {
-    pub directory: String,
+    pub name: String,
     pub builds: Vec<Build>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Build {
     pub name: String,
     pub directory: String,
@@ -15,14 +15,12 @@ pub struct Build {
     pub after_success: Option<PostBuildEvent>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum BuildType {
     Cargo,
     TypescriptReactWebpack,
-    Custom {
-        command: String,
-        args: Vec<String>,
-    }
+    #[allow(dead_code)]
+    Custom { command: String, args: Vec<String> },
 }
 
 impl BuildType {
@@ -32,12 +30,12 @@ impl BuildType {
                 let mut c = Command::new("cargo");
                 c.arg("build");
                 c
-            },
+            }
             BuildType::TypescriptReactWebpack => {
                 let mut c = Command::new("node");
                 c.arg("../../node_modules/webpack_cli/bin/cli.js");
                 c
-            },
+            }
             BuildType::Custom { command, args } => {
                 let mut c = Command::new(command);
                 c.args(args);
@@ -47,21 +45,17 @@ impl BuildType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum PostBuildEvent {
-    TriggerBuild {
-        name: String,
-    },
+    TriggerBuild { name: String },
     Run(RunType),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum RunType {
     Cargo,
-    Custom {
-        command: String,
-        args: Vec<String>,
-    }
+    #[allow(dead_code)]
+    Custom { command: String, args: Vec<String> },
 }
 
 impl RunType {
@@ -71,11 +65,8 @@ impl RunType {
                 let mut c = Command::new("cargo");
                 c.arg("run");
                 c
-            },
-            RunType::Custom {
-                command,
-                args
-            } => {
+            }
+            RunType::Custom { command, args } => {
                 let mut c = Command::new(command);
                 c.args(args);
                 c

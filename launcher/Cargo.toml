@@ -5,7 +5,7 @@ version = "0.1.0"
 [dependencies]
 actix = "*"
 actix-web = "*"
-chrono = "*"
+chrono = { version = "*", features = ["serde"] }
 clap = "*"
 failure = "*"
 lazy_static = "*"

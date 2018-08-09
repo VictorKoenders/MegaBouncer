@@ -1,17 +1,33 @@
-use std::sync::Mutex;
-use mio_extras::channel::{Sender, channel};
-use backend::{BackendRequest, RunType};
-use std::fmt;
-use chrono::{Utc, DateTime};
+use backend::{BackendRequest, Project, RunType};
+use chrono::{DateTime, Utc};
 use failure::Error;
-use std::process::ExitStatus;
+use mio_extras::channel::{channel, Sender};
+use std::fmt;
+use std::sync::Mutex;
 
+#[derive(Serialize)]
 pub struct State {
     pub running_builds: Vec<StateBuildProcess>,
     pub running_processes: Vec<StateProcess>,
     pub finished_builds: Vec<StateBuildProcess>,
+    #[serde(skip_serializing)]
     pub sender: Sender<BackendRequest>,
-    pub errors: Vec<(DateTime<Utc>, Error)>,
+    pub projects: Vec<Project>,
+    pub errors: Vec<StateError>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StateError {
+    pub time: DateTime<Utc>,
+    #[serde(serialize_with = "error_to_string")]
+    pub error: Error,
+}
+
+fn error_to_string<S>(err: &Error, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: ::serde::Serializer,
+{
+    serializer.serialize_str(&format!("{:?}", err))
 }
 
 impl fmt::Debug for State {
@@ -20,6 +36,7 @@ impl fmt::Debug for State {
             .field("running_builds", &self.running_builds)
             .field("finished_builds", &self.finished_builds)
             .field("running_processes", &self.running_processes)
+            .field("projects", &self.projects)
             .field("errors", &self.errors)
             .finish()
     }
@@ -31,6 +48,7 @@ lazy_static! {
         finished_builds: Vec::new(),
         running_processes: Vec::new(),
         sender: channel().0,
+        projects: Vec::new(),
         errors: Vec::new(),
     });
 }
@@ -38,23 +56,30 @@ lazy_static! {
 impl State {
     pub fn report_error(e: Error) {
         State::modify(|state| {
-            state.errors.push((Utc::now(), e)); 
+            state.errors.push(StateError {
+                time: Utc::now(),
+                error: e,
+            });
         });
     }
     pub fn get<F>(cb: F)
-        where F : FnOnce(&State) {
+    where
+        F: FnOnce(&State),
+    {
         let state = STATE.lock().unwrap();
         cb(&state);
     }
 
-    pub fn modify<F>(cb: F) 
-        where F : FnOnce(&mut State) {
+    pub fn modify<F>(cb: F)
+    where
+        F: FnOnce(&mut State),
+    {
         let mut state = STATE.lock().unwrap();
         cb(&mut state);
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StateProcess {
     pub directory: String,
     pub run_type: RunType,
@@ -77,8 +102,7 @@ impl StateProcess {
     }
 }
 
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StateBuildProcess {
     pub directory: String,
     pub build: String,
@@ -101,9 +125,9 @@ impl StateBuildProcess {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum StateProcessState {
     Running,
     Failed,
-    Success(ExitStatus),
+    Success(i32),
 }

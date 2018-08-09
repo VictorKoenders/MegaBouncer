@@ -9,17 +9,21 @@ pub use self::running_build::{RunningBuild, RunningProcess};
 use mio::{Events, PollOpt, Ready, Token};
 use mio_extras::channel::channel;
 use state::State;
+use std::fs;
 use std::sync::mpsc::TryRecvError;
 use Result;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum BackendRequest {
-    StartBuild { directory: String, name: String },
+    StartBuild { project_name: String, build_name: String },
 }
 
 pub fn run(base_dir: &str) -> Result<()> {
-    let projects = get_projects();
+    let projects = get_projects(base_dir)?;
+    State::modify(|state| {
+        state.projects = projects.clone();
+    });
     let mut backend = Backend::new(projects)?;
 
     let (sender, receiver) = channel();
@@ -45,8 +49,8 @@ pub fn run(base_dir: &str) -> Result<()> {
                         }
                     };
                     match request {
-                        BackendRequest::StartBuild { directory, name } => {
-                            if let Err(e) = backend.start_build(base_dir, directory, name) {
+                        BackendRequest::StartBuild { project_name, build_name } => {
+                            if let Err(e) = backend.start_build(project_name, build_name) {
                                 State::report_error(e);
                             }
                         }
@@ -66,21 +70,22 @@ pub fn run(base_dir: &str) -> Result<()> {
                         if let Some(follow_up) = &backend.running_builds[index].build.after_success
                         {
                             match follow_up {
-                                PostBuildEvent::Run(_type) => {
-                                    let directory = backend.running_builds[index].directory.clone();
-                                    start_process = Some((directory, _type.clone()));
+                                PostBuildEvent::Run(run_type) => {
+                                    let project_name = backend.running_builds[index].project_name.clone();
+                                    let build = backend.running_builds[index].build.clone();
+                                    start_process = Some((project_name, build, run_type.clone()));
                                 }
                                 PostBuildEvent::TriggerBuild { name } => {
-                                    let directory = backend.running_builds[index].directory.clone();
-                                    start_build = Some((directory, name.clone()));
+                                    let project_name = backend.running_builds[index].project_name.clone();
+                                    start_build = Some((project_name, name.clone()));
                                 }
                             }
                         }
-                        if let Some((directory, build)) = start_build {
-                            backend.start_build(base_dir, directory, build)?;
+                        if let Some((project_name, build_name)) = start_build {
+                            backend.start_build(project_name, build_name)?;
                         }
-                        if let Some((directory, run_type)) = start_process {
-                            backend.start_process(base_dir, directory, run_type)?;
+                        if let Some((project_name, build, run_type)) = start_process {
+                            backend.start_process(project_name, build, run_type)?;
                         }
                     }
                     backend.running_builds.remove(index);
@@ -116,15 +121,60 @@ impl ProcessResult {
     }
 }
 
-fn get_projects() -> Vec<Project> {
-    vec![Project {
-        directory: "server".to_string(),
-        builds: vec![Build {
-            name: "cargo".to_string(),
-            directory: "".to_string(),
-            pattern: "*.rs,*.toml".to_string(),
+fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
+    let mut path_buf = dir.to_path_buf();
+    let project_name = match dir.file_name().and_then(|s| s.to_str()) {
+        Some(f) => f,
+        None => return Ok(None)
+    };
+    let mut result = Project {
+        name: project_name.to_string(),
+        builds: Vec::new(),
+    };
+    path_buf.push("Cargo.toml");
+    if path_buf.exists() && path_buf.is_file() {
+        path_buf.pop();
+        result.builds.push(Build {
+            name: String::from("cargo"),
+            directory: path_buf.to_string_lossy().to_string(),
+            pattern: String::new(),
             build: BuildType::Cargo,
-            after_success: Some(PostBuildEvent::Run(RunType::Cargo)),
-        }],
-    }]
+            after_success: Some(PostBuildEvent::Run(RunType::Cargo))
+        });
+    }
+
+    path_buf.pop();
+    path_buf.push("ui");
+    if path_buf.exists() {
+        result.builds.push(Build {
+            name: String::from("webpack"),
+            directory: path_buf.to_string_lossy().to_string(),
+            pattern: String::new(),
+            build: BuildType::TypescriptReactWebpack,
+            after_success: Some(PostBuildEvent::TriggerBuild { name: String::from("cargo") }),
+        });
+    }
+
+    if result.builds.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(result))
+    }
+}
+
+fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
+    let mut result = Vec::new();
+    for dir in fs::read_dir(base_dir)?.filter_map(|d| d.ok()) {
+        if !dir.path().is_dir() { continue; }
+        let name = dir.file_name();
+        let name = match name.to_str() {
+            Some(n) => n,
+            None => continue,
+        };
+        if name.starts_with(".") {
+            continue;
+        }
+        result.extend(get_projects_in_dir(&dir.path())?);
+    }
+    Ok(result)
 }

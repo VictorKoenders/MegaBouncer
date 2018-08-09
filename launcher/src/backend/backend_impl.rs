@@ -1,8 +1,8 @@
-use super::{ProcessResult, Project, RunType, RunningBuild, RunningProcess};
+use super::{Build, ProcessResult, Project, RunType, RunningBuild, RunningProcess};
 use chrono::Utc;
 use mio::{Poll, PollOpt, Ready, Token};
 use mio_child_process::{ProcessEvent, StdioChannel};
-use state::{State, StateBuildProcess, StateProcess, StateProcessState};
+use state::{State, StateBuildProcess, StateError, StateProcess, StateProcessState};
 use std::sync::mpsc::TryRecvError;
 use Result;
 
@@ -26,30 +26,34 @@ impl Backend {
         })
     }
 
-    pub fn start_build(&mut self, base_dir: &str, directory: String, build: String) -> Result<()> {
+    pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
         for b in self
             .running_builds
             .iter()
-            .filter(|b| b.directory == directory)
+            .filter(|b| b.project_name == project_name)
         {
-            if b.build.name == build {
-                bail!("Could not start {}::{}, already running", directory, build);
+            if b.build.name == build_name {
+                bail!(
+                    "Could not start {}::{}, already running",
+                    project_name,
+                    build_name
+                );
             }
         }
         let build = {
-            let project = match self.projects.iter().find(|p| p.directory == directory) {
+            let project = match self.projects.iter().find(|p| p.name == project_name) {
                 Some(p) => p,
                 None => {
-                    bail!("Could not start {:?}, not found", directory);
+                    bail!("Could not start {:?}, not found", project_name);
                 }
             };
-            let build = match project.builds.iter().find(|b| b.name == build) {
+            let build = match project.builds.iter().find(|b| b.name == build_name) {
                 Some(b) => b,
                 None => {
                     bail!(
                         "Could not start {}::{}, available:{:?}",
-                        directory,
-                        build,
+                        project_name,
+                        build_name,
                         project.builds
                     );
                 }
@@ -57,7 +61,7 @@ impl Backend {
 
             let token = Token(self.next_token);
             self.next_token += 1;
-            let mut running_build = RunningBuild::new(base_dir, directory.clone(), build.clone(), token)?;
+            let mut running_build = RunningBuild::new(project_name.clone(), build.clone(), token)?;
             let id = running_build.process.id();
 
             if let Err(e) =
@@ -65,11 +69,11 @@ impl Backend {
                     .register(&running_build.process, token, Ready::all(), PollOpt::edge())
             {
                 let _ = running_build.process.kill();
-                bail!("Could not spawn {}::{}: {:?}", directory, build.name, e);
+                bail!("Could not spawn {}::{}: {:?}", project_name, build.name, e);
             }
             State::modify(|s| {
                 s.running_builds.push(StateBuildProcess::new(
-                    directory.clone(),
+                    project_name.clone(),
                     build.name.clone(),
                     id,
                 ));
@@ -80,12 +84,17 @@ impl Backend {
         Ok(())
     }
 
-    pub fn start_process(&mut self, base_dir: &str, directory: String, run: RunType) -> Result<()> {
-        println!("Starting {}::{:?}", directory, run);
+    pub fn start_process(
+        &mut self,
+        project_name: String,
+        build: Build,
+        run: RunType,
+    ) -> Result<()> {
+        println!("Starting {}::{} {:?}", project_name, build.name, run);
         while let Some(index) = self
             .running_processes
             .iter()
-            .position(|p| p.directory == directory && p._type == run)
+            .position(|p| p.project_name == project_name && p.run_type == run)
         {
             let mut process = self.running_processes.remove(index);
             let id = process.process.id();
@@ -97,7 +106,8 @@ impl Backend {
         }
 
         let token = Token(self.next_token);
-        let mut running_process = RunningProcess::new(base_dir, directory.clone(), run.clone(), token)?;
+        let mut running_process =
+            RunningProcess::new(project_name.clone(), build.clone(), run.clone(), token)?;
         self.next_token += 1;
         let id = running_process.process.id();
         if let Err(e) = self.poll.register(
@@ -107,12 +117,18 @@ impl Backend {
             PollOpt::edge(),
         ) {
             let _ = running_process.process.kill();
-            bail!("Could not spawn {}::{:?}: {:?}", directory, run, e);
+            bail!(
+                "Could not spawn {}::{} {:?}: {:?}",
+                project_name,
+                build.name,
+                run,
+                e
+            );
         }
         self.running_processes.push(running_process);
         State::modify(|s| {
             s.running_processes
-                .push(StateProcess::new(directory, run, id));
+                .push(StateProcess::new(project_name, run, id));
         });
 
         Ok(())
@@ -140,21 +156,30 @@ impl Backend {
                                 state.running_builds[index].stderr += &e
                             }
                             ProcessEvent::CommandError(e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
                             ProcessEvent::IoError(_, e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
                             ProcessEvent::Utf8Error(_, e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
@@ -162,7 +187,8 @@ impl Backend {
                             }
                             ProcessEvent::Exit(status) => {
                                 let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Success(status);
+                                process.status =
+                                    StateProcessState::Success(status.code().unwrap_or(0));
                                 state.finished_builds.push(process);
                                 finished = true;
                                 finished_succesfully = status.success();
@@ -214,21 +240,30 @@ impl Backend {
                                 state.running_processes[index].stderr += &e
                             }
                             ProcessEvent::CommandError(e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
                             ProcessEvent::IoError(_, e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
                                 finished = true;
                             }
                             ProcessEvent::Utf8Error(_, e) => {
-                                state.errors.push((Utc::now(), e.into()));
+                                state.errors.push(StateError {
+                                    time: Utc::now(),
+                                    error: e.into(),
+                                });
                                 let mut process = state.running_builds.remove(index);
                                 process.status = StateProcessState::Failed;
                                 state.finished_builds.push(process);
@@ -236,7 +271,8 @@ impl Backend {
                             }
                             ProcessEvent::Exit(status) => {
                                 let mut process = state.running_builds.remove(index);
-                                process.status = StateProcessState::Success(status);
+                                process.status =
+                                    StateProcessState::Success(status.code().unwrap_or(0));
                                 state.finished_builds.push(process);
                                 finished = true;
                                 finished_succesfully = status.success();
