@@ -115,6 +115,7 @@ var Root = /** @class */ (function (_super) {
             state: null,
             open_uuids: [],
         };
+        _this.interval = 0;
         return _this;
     }
     Root.prototype.componentWillMount = function () {
@@ -125,15 +126,25 @@ var Root = /** @class */ (function (_super) {
         fetch("/api/state")
             .then(function (r) { return r.json(); })
             .then(function (r) {
+            if (_this.state.state) {
+                var running_frontend_build_1 = _this.state.state.running_builds.find(function (b) { return b.directory == "launcher" && b.build == "webpack"; });
+                if (running_frontend_build_1) {
+                    var finished_build = r.finished_builds.find(function (b) { return b.uuid == running_frontend_build_1.uuid; });
+                    if (finished_build && finished_build.error === "None" && finished_build.status === 0) {
+                        document.location.reload();
+                    }
+                }
+            }
             _this.setState({
                 state: r
             });
             clearTimeout(_this.interval);
-            _this.interval = setTimeout(_this.fetch.bind(_this), 100);
+            _this.interval = setTimeout(_this.fetch.bind(_this), 1000);
         })
-            .catch(function () {
+            .catch(function (e) {
+            console.error(e);
             clearTimeout(_this.interval);
-            _this.interval = setTimeout(_this.fetch.bind(_this), 100);
+            _this.interval = setTimeout(_this.fetch.bind(_this), 1000);
         });
     };
     Root.prototype.render_time = function (diff) {
@@ -198,7 +209,7 @@ var Root = /** @class */ (function (_super) {
             status_text = "Success";
             status_color = "green";
         }
-        var title = React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
+        var title = React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid), key: index },
             React.createElement("b", null,
                 build.directory,
                 "::",
@@ -261,7 +272,7 @@ var Root = /** @class */ (function (_super) {
         ev.stopPropagation();
         var uuids = this.state.open_uuids;
         var index = uuids.findIndex(function (u) { return u == uuid; });
-        if (index !== -1) {
+        if (index !== null && index >= 0) {
             uuids.splice(index, 1);
         }
         else {
@@ -282,20 +293,29 @@ var Root = /** @class */ (function (_super) {
         });
         return false;
     };
+    Root.prototype.render_error = function (err, index) {
+        return React.createElement("p", { key: index },
+            React.createElement("b", null,
+                this.render_time(Date.now() - new Date(err.time).getTime()),
+                " ago"),
+            React.createElement("br", null),
+            err.error);
+    };
     Root.prototype.render = function () {
         if (!this.state.state)
             return React.createElement(React.Fragment, null);
         return React.createElement(React.Fragment, null,
-            React.createElement("div", { style: { display: 'flex', flexDirection: 'row' } },
-                React.createElement("div", { style: { width: '50%' } },
+            React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'row', borderBottom: '1px solid #555' } },
+                React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } },
                     React.createElement("h2", null, "Processes:"),
                     this.state.state.running_processes.map(this.render_process.bind(this))),
-                React.createElement("div", { style: { width: '50%' } }, this.state.state.projects.map(this.render_project.bind(this)))),
-            React.createElement("div", { style: { display: 'flex', flexDirection: 'row' } },
-                React.createElement("div", { style: { width: '50%' } },
+                React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } }, this.state.state.errors.map(this.render_error.bind(this))),
+                React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 5 } }, this.state.state.projects.map(this.render_project.bind(this)))),
+            React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'row' } },
+                React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } },
                     React.createElement("h2", null, "Running:"),
                     this.state.state.running_builds.map(this.render_running_build.bind(this))),
-                React.createElement("div", { style: { width: '50%' } },
+                React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 5 } },
                     React.createElement("h2", null, "Finished:"),
                     this.state.state.finished_builds.map(this.render_finished_build.bind(this)))));
     };
@@ -330,7 +350,9 @@ ReactDOM.render(React.createElement(Root_1.Root, null), document.getElementById(
   !*** ./src/polyfill.ts ***!
   \*************************/
 /*! no static exports found */
-/***/ (function(module, exports) {
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
 
 if (!Array.prototype.find) {
     Object.defineProperty(Array.prototype, "find", {

@@ -15,6 +15,7 @@ export class Root extends React.Component<Props, State> {
             state: null,
             open_uuids: [],
         };
+        this.interval = 0;
     }
 
     componentWillMount() {
@@ -25,15 +26,25 @@ export class Root extends React.Component<Props, State> {
         fetch("/api/state")
             .then(r => r.json())
             .then((r: server.State) => {
+                if(this.state.state) {
+                    let running_frontend_build = this.state.state.running_builds.find(b => b.directory == "launcher" && b.build == "webpack");
+                    if(running_frontend_build) {
+                        let finished_build = r.finished_builds.find(b => b.uuid == running_frontend_build!.uuid);
+                        if(finished_build && finished_build.error === "None" && finished_build.status === 0) {
+                            document.location.reload();
+                        }
+                    }
+                }
                 this.setState({
                     state: r
                 });
                 clearTimeout(this.interval);
-                this.interval = setTimeout(this.fetch.bind(this), 100);
+                this.interval = setTimeout(this.fetch.bind(this), 1000);
             })
-            .catch(() => {
+            .catch(e => {
+                console.error(e);
                 clearTimeout(this.interval);
-                this.interval = setTimeout(this.fetch.bind(this), 100);
+                this.interval = setTimeout(this.fetch.bind(this), 1000);
             });
     }
 
@@ -95,7 +106,7 @@ export class Root extends React.Component<Props, State> {
             status_text = "Success";
             status_color = "green";
         }
-        let title = <p onClick={this.toggle_open.bind(this, build.uuid)}>
+        let title = <p onClick={this.toggle_open.bind(this, build.uuid)} key={index}>
             <b>{build.directory}::{build.build}</b>
             {' '}
             <b style={{color: status_color}}>{status_text}</b>
@@ -153,7 +164,7 @@ export class Root extends React.Component<Props, State> {
 
         let uuids = this.state.open_uuids;
         let index = uuids.findIndex(u => u == uuid);
-        if (index !== -1) {
+        if (index !== null && index >= 0) {
             uuids.splice(index, 1);
         } else {
             uuids.push(uuid);
@@ -176,24 +187,35 @@ export class Root extends React.Component<Props, State> {
 
         return false;
     }
+
+    render_error(err: server.Error, index: number) {
+        return <p key={index}>
+            <b>{this.render_time(Date.now() - new Date(err.time).getTime())} ago</b><br />
+            {err.error} 
+        </p>;
+    }
+
     render() {
         if (!this.state.state) return <></>;
         return <>
-            <div style={{ display: 'flex', flexDirection: 'row' }}>
-                <div style={{ width: '50%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'row', borderBottom: '1px solid #555' }}>
+                <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
                     <h2>Processes:</h2>
                     {this.state.state.running_processes.map(this.render_process.bind(this))}
                 </div>
-                <div style={{ width: '50%' }}>
+                <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
+                    {this.state.state.errors.map(this.render_error.bind(this))}
+                </div>
+                <div style={{ flex: 1, overflow: "auto", padding: 5 }}>
                     {this.state.state.projects.map(this.render_project.bind(this))}
                 </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'row' }}>
-                <div style={{ width: '50%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'row' }}>
+                <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
                     <h2>Running:</h2>
                     {this.state.state.running_builds.map(this.render_running_build.bind(this))}
                 </div>
-                <div style={{ width: '50%' }}>
+                <div style={{ flex: 1, overflow: "auto", padding: 5 }}>
                     <h2>Finished:</h2>
                     {this.state.state.finished_builds.map(this.render_finished_build.bind(this))}
                 </div>
