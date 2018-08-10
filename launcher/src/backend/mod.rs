@@ -109,7 +109,10 @@ pub fn run(base_dir: &str) -> Result<()> {
                 .iter()
                 .position(|b| b.token == ev.token())
             {
-                backend.update_running_process(index);
+                let result = backend.update_running_process(index);
+                if result.finished {
+                    backend.running_processes.remove(index);
+                }
             }
         }
     }

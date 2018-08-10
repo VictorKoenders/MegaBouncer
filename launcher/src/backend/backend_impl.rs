@@ -33,7 +33,11 @@ impl Backend {
     }
 
     pub fn kill_process(&mut self, pid: u32) -> Result<()> {
-        if let Some(index) = self.running_processes.iter().position(|p| p.process.id() == pid) {
+        if let Some(index) = self
+            .running_processes
+            .iter()
+            .position(|p| p.process.id() == pid)
+        {
             State::modify(|state| {
                 if let Some(index) = state.running_processes.iter().position(|p| p.id == pid) {
                     state.running_processes.remove(index);
@@ -269,15 +273,7 @@ impl Backend {
                             ProcessEvent::Data(StdioChannel::Stderr, e) => {
                                 state.running_processes[index].stderr += &e
                             }
-                            ProcessEvent::CommandError(e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                state.running_processes.remove(index);
-                                finished = true;
-                            }
-                            ProcessEvent::IoError(_, e) => {
+                            ProcessEvent::CommandError(e) | ProcessEvent::IoError(_, e) => {
                                 state.errors.push(StateError {
                                     time: Utc::now(),
                                     error: e.into(),
