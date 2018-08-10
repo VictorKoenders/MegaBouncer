@@ -50,6 +50,15 @@ impl Backend {
     }
 
     pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
+        while let Some(index) = self.running_processes.iter().position(|p| p.project_name == project_name && p.build.name == build_name) {
+            let mut process = self.running_processes.remove(index);
+            let id = process.process.id();
+            println!("Killing process {} because we're starting a new build", id);
+            process.process.kill()?;
+            State::modify(|state| {
+                state.running_processes.retain(|p| p.id != id);
+            });
+        }
         for b in self
             .running_builds
             .iter()
