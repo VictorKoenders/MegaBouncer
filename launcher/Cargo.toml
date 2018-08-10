@@ -10,16 +10,14 @@ failure = "*"
 lazy_static = "*"
 mio = "*"
 mio-extras = "*"
+notify = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
 sysinfo = "*"
+prometheus = "*"
 
 [dependencies.chrono]
-features = ["serde"]
-version = "*"
-
-[dependencies.uuid]
 features = ["serde"]
 version = "*"
 
@@ -28,3 +26,7 @@ path = "../libs/mio-child-process"
 
 [dependencies.shared]
 path = "../shared"
+
+[dependencies.uuid]
+features = ["serde"]
+version = "*"

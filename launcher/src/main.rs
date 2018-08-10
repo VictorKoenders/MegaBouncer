@@ -16,10 +16,12 @@ extern crate shared;
 #[macro_use]
 extern crate failure;
 extern crate uuid;
+extern crate notify;
 
 mod backend;
 mod server;
 mod state;
+mod filewatcher;
 
 use clap::{App, Arg};
 use std::thread::spawn;
@@ -38,7 +40,15 @@ fn main() {
         ).get_matches();
 
     spawn(server::run);
-    if let Err(e) = backend::run(matches.value_of("base_dir").unwrap()) {
+    let base_dir = matches.value_of("base_dir").unwrap().to_string();
+    let cloned_base_dir = base_dir.clone();
+    spawn(move || {
+        if let Err(e) = filewatcher::run(&cloned_base_dir) {
+            println!("Filewatcher failed: {:?}", e);
+            std::process::exit(-1);
+        }
+    });
+    if let Err(e) = backend::run(&base_dir) {
         println!("Backend failed: {:?}", e);
         std::process::exit(-1);
     }

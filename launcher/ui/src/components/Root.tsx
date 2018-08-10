@@ -8,6 +8,7 @@ export interface State {
 
 export class Root extends React.Component<Props, State> {
     interval: number;
+
     constructor(props: Props, context?: any) {
         super(props, context);
         this.state = {
@@ -15,10 +16,11 @@ export class Root extends React.Component<Props, State> {
             open_uuids: [],
         };
     }
+
     componentWillMount() {
-        this.interval = setInterval(this.fetch.bind(this), 1000);
         this.fetch();
     }
+
     fetch() {
         fetch("/api/state")
             .then(r => r.json())
@@ -26,58 +28,90 @@ export class Root extends React.Component<Props, State> {
                 this.setState({
                     state: r
                 });
+                clearTimeout(this.interval);
+                this.interval = setTimeout(this.fetch.bind(this), 100);
+            })
+            .catch(() => {
+                clearTimeout(this.interval);
+                this.interval = setTimeout(this.fetch.bind(this), 100);
             });
     }
+
     render_time(diff: number) {
         diff = Math.ceil(diff / 1000);
-        var result = "";
-        if (diff > 3600) {
+        let result = "";
+        let show_seconds = true;
+        let show_minutes = true;
+        let show_hours = true;
+        if (diff >= 86400) {
+            let days = Math.floor(diff / 86400);
+            diff -= days * 3600;
+            result += days + " days";
+            show_minutes = false;
+            show_seconds = false;
+        }
+        if (diff >= 3600 && show_hours) {
             let hours = Math.floor(diff / 3600);
             diff -= hours * 3600;
             result += hours + " hours";
+            show_seconds = false;
         }
-        if (diff > 60) {
+        if (diff >= 60 && show_minutes) {
             if (result) result += ", ";
             let minutes = Math.floor(diff / 60);
             diff -= minutes * 60;
-            result += diff + " minutes";
+            result += minutes + " minutes";
         }
-        if (diff > 0) {
+        if (diff > 0 && show_seconds) {
             if (result) result += ", ";
             result += diff + " seconds";
         }
         return result;
     }
+
     render_running_build(build: server.RunningBuild, index: number): JSX.Element {
         let start = new Date(build.started_on);
         let diff = Date.now() - start.getTime();
         return <div key={index}>
             <p onClick={this.toggle_open.bind(this, build.uuid)}>
-                <b>{build.build}</b> (running for {this.render_time(diff)})
+                <b>{build.directory}::{build.build}</b> (running for {this.render_time(diff)})
             </p>
             <pre>{build.stdout}</pre>
             <pre>{build.stderr}</pre>
         </div>;
     }
+
     render_finished_build(build: server.FinishedBuild, index: number): JSX.Element {
         let start = new Date(build.started_on);
         let end = new Date(build.ended_on);
         let diff = end.getTime() - start.getTime();
         let is_open = this.state.open_uuids.some(u => u == build.uuid);
-        if (is_open) {
-            return <div key={index}>
-                <p onClick={this.toggle_open.bind(this, build.uuid)}>
-                    <b>{build.build}</b> (finished in {this.render_time(diff)})
-                </p>
-                <pre>{build.stdout}</pre>
-                <pre>{build.stderr}</pre>
-            </div>;
+
+        let status_text, status_color;
+        if(build.error !== "None" || build.status !== 0) {
+            status_text = "Error";
+            status_color = "red";
         } else {
-            return <p key={index} onClick={this.toggle_open.bind(this, build.uuid)}>
-                <b>{build.build}</b> (finished in {this.render_time(diff)})
-            </p>;
+            status_text = "Success";
+            status_color = "green";
         }
+        let title = <p onClick={this.toggle_open.bind(this, build.uuid)}>
+            <b>{build.directory}::{build.build}</b>
+            {' '}
+            <b style={{color: status_color}}>{status_text}</b>
+            {' '}
+            (finished {this.render_time(Date.now() - end.getTime())} ago, in {this.render_time(diff)})
+        </p>;
+        if (!is_open) {
+            return title;
+        }
+        return <div key={index}>
+            {title}
+            <pre>{build.stdout}</pre>
+            <pre>{build.stderr}</pre>
+        </div>;
     }
+
     render_process(process: server.RunningProcess, index: number) {
         let is_open = this.state.open_uuids.some(u => u == process.uuid);
         if (is_open) {

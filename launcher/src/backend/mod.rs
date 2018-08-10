@@ -151,7 +151,7 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
         result.builds.push(Build {
             name: String::from("cargo"),
             directory: path_buf.to_string_lossy().to_string(),
-            pattern: String::new(),
+            pattern: String::from(".rs,.toml"),
             build: BuildType::Cargo,
             after_success: Some(PostBuildEvent::Run(RunType::Cargo)),
         });
@@ -164,7 +164,7 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
         result.builds.push(Build {
             name: String::from("webpack"),
             directory: path_buf.to_string_lossy().to_string(),
-            pattern: String::new(),
+            pattern: String::from(".ts,.tsx"),
             build: BuildType::TypescriptReactWebpack,
             after_success: if project_name != "launcher" {
                 Some(PostBuildEvent::TriggerBuild {
@@ -183,7 +183,7 @@ fn get_projects_in_dir(dir: &PathBuf) -> Result<Option<Project>> {
     }
 }
 
-fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
+pub fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
     let mut result = Vec::new();
     for dir in fs::read_dir(base_dir)?.filter_map(|d| d.ok()) {
         if !dir.path().is_dir() {
@@ -199,5 +199,9 @@ fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
         }
         result.extend(get_projects_in_dir(&dir.path())?);
     }
-    Ok(result)
+    if result.is_empty() {
+        Err(format_err!("No projects found in directory"))
+    } else {
+        Ok(result)
+    }
 }

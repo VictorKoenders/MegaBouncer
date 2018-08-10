@@ -118,7 +118,6 @@ var Root = /** @class */ (function (_super) {
         return _this;
     }
     Root.prototype.componentWillMount = function () {
-        this.interval = setInterval(this.fetch.bind(this), 1000);
         this.fetch();
     };
     Root.prototype.fetch = function () {
@@ -129,24 +128,41 @@ var Root = /** @class */ (function (_super) {
             _this.setState({
                 state: r
             });
+            clearTimeout(_this.interval);
+            _this.interval = setTimeout(_this.fetch.bind(_this), 100);
+        })
+            .catch(function () {
+            clearTimeout(_this.interval);
+            _this.interval = setTimeout(_this.fetch.bind(_this), 100);
         });
     };
     Root.prototype.render_time = function (diff) {
         diff = Math.ceil(diff / 1000);
         var result = "";
-        if (diff > 3600) {
+        var show_seconds = true;
+        var show_minutes = true;
+        var show_hours = true;
+        if (diff >= 86400) {
+            var days = Math.floor(diff / 86400);
+            diff -= days * 3600;
+            result += days + " days";
+            show_minutes = false;
+            show_seconds = false;
+        }
+        if (diff >= 3600 && show_hours) {
             var hours = Math.floor(diff / 3600);
             diff -= hours * 3600;
             result += hours + " hours";
+            show_seconds = false;
         }
-        if (diff > 60) {
+        if (diff >= 60 && show_minutes) {
             if (result)
                 result += ", ";
             var minutes = Math.floor(diff / 60);
             diff -= minutes * 60;
-            result += diff + " minutes";
+            result += minutes + " minutes";
         }
-        if (diff > 0) {
+        if (diff > 0 && show_seconds) {
             if (result)
                 result += ", ";
             result += diff + " seconds";
@@ -158,7 +174,10 @@ var Root = /** @class */ (function (_super) {
         var diff = Date.now() - start.getTime();
         return React.createElement("div", { key: index },
             React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
-                React.createElement("b", null, build.build),
+                React.createElement("b", null,
+                    build.directory,
+                    "::",
+                    build.build),
                 " (running for ",
                 this.render_time(diff),
                 ")"),
@@ -170,23 +189,35 @@ var Root = /** @class */ (function (_super) {
         var end = new Date(build.ended_on);
         var diff = end.getTime() - start.getTime();
         var is_open = this.state.open_uuids.some(function (u) { return u == build.uuid; });
-        if (is_open) {
-            return React.createElement("div", { key: index },
-                React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
-                    React.createElement("b", null, build.build),
-                    " (finished in ",
-                    this.render_time(diff),
-                    ")"),
-                React.createElement("pre", null, build.stdout),
-                React.createElement("pre", null, build.stderr));
+        var status_text, status_color;
+        if (build.error !== "None" || build.status !== 0) {
+            status_text = "Error";
+            status_color = "red";
         }
         else {
-            return React.createElement("p", { key: index, onClick: this.toggle_open.bind(this, build.uuid) },
-                React.createElement("b", null, build.build),
-                " (finished in ",
-                this.render_time(diff),
-                ")");
+            status_text = "Success";
+            status_color = "green";
         }
+        var title = React.createElement("p", { onClick: this.toggle_open.bind(this, build.uuid) },
+            React.createElement("b", null,
+                build.directory,
+                "::",
+                build.build),
+            ' ',
+            React.createElement("b", { style: { color: status_color } }, status_text),
+            ' ',
+            "(finished ",
+            this.render_time(Date.now() - end.getTime()),
+            " ago, in ",
+            this.render_time(diff),
+            ")");
+        if (!is_open) {
+            return title;
+        }
+        return React.createElement("div", { key: index },
+            title,
+            React.createElement("pre", null, build.stdout),
+            React.createElement("pre", null, build.stderr));
     };
     Root.prototype.render_process = function (process, index) {
         var is_open = this.state.open_uuids.some(function (u) { return u == process.uuid; });
