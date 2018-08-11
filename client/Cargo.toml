@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 
 [dependencies]
-web-view = { git = "https://github.com/VictorKoenders/web-view", rev = "626df792738a68004db813693be4cebc1f2d88c5" }
 urlencoding = "*"
 serde_json = "*"
 shared = { path = "../shared" }
