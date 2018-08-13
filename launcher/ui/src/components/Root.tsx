@@ -100,7 +100,6 @@ export class Root extends React.Component<Props, State> {
 
         let status_text, status_color;
         if (build.error || build.status !== 0) {
-            console.log(build);
             status_text = build.error || "Error";
             status_color = "red";
         } else {

@@ -202,7 +202,6 @@ var Root = /** @class */ (function (_super) {
         var is_open = this.state.open_uuids.some(function (u) { return u == build.uuid; });
         var status_text, status_color;
         if (build.error || build.status !== 0) {
-            console.log(build);
             status_text = build.error || "Error";
             status_color = "red";
         }
