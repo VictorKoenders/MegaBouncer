@@ -1,8 +1,9 @@
 use backend::{BackendRequest, Project, RunType};
 use chrono::{DateTime, Utc};
 use failure::Error;
-use mio_extras::channel::{channel, Sender};
+use mio_extras::channel::{channel as mio_channel, Sender as MioSender};
 use std::fmt;
+use std::sync::mpsc::{channel as std_channel, Sender as StdSender};
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -12,13 +13,14 @@ pub struct State {
     pub running_builds: Vec<RunningBuild>,
     pub finished_builds: Vec<FinishedBuild>,
     #[serde(skip_serializing)]
-    pub backend_sender: Sender<BackendRequest>,
+    pub backend_sender: MioSender<BackendRequest>,
     #[serde(skip_serializing)]
-    pub change_sender: Sender<StateChange>,
+    pub change_sender: StdSender<StateChange>,
     pub projects: Vec<Project>,
     pub errors: Vec<StateError>,
 }
 
+#[derive(Debug)]
 pub enum StateChange {
     ErrorAdded(StateError),
 
@@ -65,8 +67,8 @@ lazy_static! {
         running_builds: Vec::new(),
         finished_builds: Vec::new(),
         running_processes: Vec::new(),
-        backend_sender: channel().0,
-        change_sender: channel().0,
+        backend_sender: mio_channel().0,
+        change_sender: std_channel().0,
         projects: Vec::new(),
         errors: Vec::new(),
     });
@@ -108,9 +110,14 @@ impl State {
             .expect("Change sender failed");
     }
 
-    pub fn set_backend_sender(sender: Sender<BackendRequest>) {
+    pub fn set_backend_sender(sender: MioSender<BackendRequest>) {
         let mut state = STATE.lock().unwrap();
         state.backend_sender = sender;
+    }
+
+    pub fn set_change_sender(sender: StdSender<StateChange>) {
+        let mut state = STATE.lock().unwrap();
+        state.change_sender = sender;
     }
 }
 impl State {

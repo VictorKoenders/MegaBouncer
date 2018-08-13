@@ -130,7 +130,7 @@ var Root = /** @class */ (function (_super) {
                 var running_frontend_build_1 = _this.state.state.running_builds.find(function (b) { return b.directory == "launcher" && b.build == "webpack"; });
                 if (running_frontend_build_1) {
                     var finished_build = r.finished_builds.find(function (b) { return b.uuid == running_frontend_build_1.uuid; });
-                    if (finished_build && finished_build.error === "None" && finished_build.status === 0) {
+                    if (finished_build && finished_build.error === null && finished_build.status === 0) {
                         document.location.reload();
                     }
                 }
@@ -201,8 +201,9 @@ var Root = /** @class */ (function (_super) {
         var diff = end.getTime() - start.getTime();
         var is_open = this.state.open_uuids.some(function (u) { return u == build.uuid; });
         var status_text, status_color;
-        if (build.error !== "None" || build.status !== 0) {
-            status_text = "Error";
+        if (build.error || build.status !== 0) {
+            console.log(build);
+            status_text = build.error || "Error";
             status_color = "red";
         }
         else {

@@ -26,7 +26,7 @@ declare module server {
         started_on: any;
         ended_on: string;
         status: number;
-        error: string;
+        error: string | null;
         id: number;
         stdout: string;
         stderr: string;

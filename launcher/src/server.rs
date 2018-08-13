@@ -2,6 +2,8 @@ use actix_web::fs::NamedFile;
 use actix_web::{server, App, HttpRequest, Responder};
 use backend::BackendRequest;
 use state::State;
+use std::sync::mpsc::channel;
+use std::thread::spawn;
 use Result;
 
 fn trigger_build(req: &HttpRequest) -> impl Responder {
@@ -30,7 +32,7 @@ fn kill(req: &HttpRequest) -> Result<&'static str> {
     }).map(|_| "Ok")
 }
 fn status(_req: &HttpRequest) -> impl Responder {
-    State::get(|state| ::serde_json::to_string_pretty(&state).map_err(Into::into)).map(|_| "Ok")
+    State::get(|state| ::serde_json::to_string_pretty(&state).map_err(Into::into))
 }
 
 fn index(_req: &HttpRequest) -> impl Responder {
@@ -46,6 +48,13 @@ fn bundle_map(_req: &HttpRequest) -> impl Responder {
 }
 
 pub fn run() {
+    let (sender, receiver) = channel();
+    State::set_change_sender(sender);
+    spawn(move || {
+        while let Ok(item) = receiver.recv() {
+            println!("Change: {:?}", item);
+        }
+    });
     server::new(|| {
         App::new()
             .resource("/", |r| r.f(index))

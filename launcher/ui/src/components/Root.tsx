@@ -26,11 +26,11 @@ export class Root extends React.Component<Props, State> {
         fetch("/api/state")
             .then(r => r.json())
             .then((r: server.State) => {
-                if(this.state.state) {
+                if (this.state.state) {
                     let running_frontend_build = this.state.state.running_builds.find(b => b.directory == "launcher" && b.build == "webpack");
-                    if(running_frontend_build) {
+                    if (running_frontend_build) {
                         let finished_build = r.finished_builds.find(b => b.uuid == running_frontend_build!.uuid);
-                        if(finished_build && finished_build.error === "None" && finished_build.status === 0) {
+                        if (finished_build && finished_build.error === null && finished_build.status === 0) {
                             document.location.reload();
                         }
                     }
@@ -99,8 +99,9 @@ export class Root extends React.Component<Props, State> {
         let is_open = this.state.open_uuids.some(u => u == build.uuid);
 
         let status_text, status_color;
-        if(build.error !== "None" || build.status !== 0) {
-            status_text = "Error";
+        if (build.error || build.status !== 0) {
+            console.log(build);
+            status_text = build.error || "Error";
             status_color = "red";
         } else {
             status_text = "Success";
@@ -109,7 +110,7 @@ export class Root extends React.Component<Props, State> {
         let title = <p onClick={this.toggle_open.bind(this, build.uuid)} key={index}>
             <b>{build.directory}::{build.build}</b>
             {' '}
-            <b style={{color: status_color}}>{status_text}</b>
+            <b style={{ color: status_color }}>{status_text}</b>
             {' '}
             (finished {this.render_time(Date.now() - end.getTime())} ago, in {this.render_time(diff)})
         </p>;
@@ -191,7 +192,7 @@ export class Root extends React.Component<Props, State> {
     render_error(err: server.Error, index: number) {
         return <p key={index}>
             <b>{this.render_time(Date.now() - new Date(err.time).getTime())} ago</b><br />
-            {err.error} 
+            {err.error}
         </p>;
     }
 
