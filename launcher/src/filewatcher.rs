@@ -1,6 +1,6 @@
-use backend::{Build, Project, BackendRequest};
-use state::State;
+use backend::{BackendRequest, Build, Project};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use state::State;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
@@ -72,22 +72,19 @@ pub fn run(base_dir: &str) -> Result<()> {
         };
 
         if !builds_to_trigger.is_empty() {
-            let mut error = None;
             State::get(|state| {
                 for (project, build) in builds_to_trigger {
-                    println!("Triggering {}::{} because of {:?}", project.name, build.name, file);
-                    if let Err(e) = state.sender.send(BackendRequest::StartBuild {
+                    println!(
+                        "Triggering {}::{} because of {:?}",
+                        project.name, build.name, file
+                    );
+                    state.backend_sender.send(BackendRequest::StartBuild {
                         project_name: project.name.clone(),
                         build_name: build.name.clone(),
-                    }) {
-                        error = Some(e);
-                        break;
-                    }
+                    })?;
                 }
-            });
-            if let Some(e) = error {
-                return Err(e.into());
-            }
+                Ok(())
+            })?;
         }
     }
 }

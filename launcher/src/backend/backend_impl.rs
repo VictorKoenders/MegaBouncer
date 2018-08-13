@@ -2,13 +2,9 @@ use super::{
     Build, ProcessResult, Project, RunType, RunningBuild as BackendRunningBuild,
     RunningProcess as BackendRunningProcess,
 };
-use chrono::Utc;
 use mio::{Poll, PollOpt, Ready, Token};
 use mio_child_process::{ProcessEvent, StdioChannel};
-use state::{
-    FinishedBuild as StateFinishedBuild, RunningBuild as StateRunningBuild,
-    RunningProcess as StateRunningProcess, State, StateError,
-};
+use state::State;
 use std::sync::mpsc::TryRecvError;
 use Result;
 
@@ -38,11 +34,7 @@ impl Backend {
             .iter()
             .position(|p| p.process.id() == pid)
         {
-            State::modify(|state| {
-                if let Some(index) = state.running_processes.iter().position(|p| p.id == pid) {
-                    state.running_processes.remove(index);
-                }
-            });
+            State::remove_running_process_by_pid(pid);
             let mut process = self.running_processes.remove(index);
             process.process.kill()?;
         }
@@ -50,14 +42,16 @@ impl Backend {
     }
 
     pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
-        while let Some(index) = self.running_processes.iter().position(|p| p.project_name == project_name && p.build.name == build_name) {
+        while let Some(index) = self
+            .running_processes
+            .iter()
+            .position(|p| p.project_name == project_name && p.build.name == build_name)
+        {
             let mut process = self.running_processes.remove(index);
-            let id = process.process.id();
-            println!("Killing process {} because we're starting a new build", id);
+            let pid = process.process.id();
+            println!("Killing process {} because we're starting a new build", pid);
             process.process.kill()?;
-            State::modify(|state| {
-                state.running_processes.retain(|p| p.id != id);
-            });
+            State::remove_running_process_by_pid(pid);
         }
         for b in self
             .running_builds
@@ -104,13 +98,7 @@ impl Backend {
                 let _ = running_build.process.kill();
                 bail!("Could not spawn {}::{}: {:?}", project_name, build.name, e);
             }
-            State::modify(|s| {
-                s.running_builds.push(StateRunningBuild::new(
-                    project_name.clone(),
-                    build.name.clone(),
-                    id,
-                ));
-            });
+            State::add_running_build(project_name.clone(), build.name.clone(), id);
             running_build
         };
         self.running_builds.push(build);
@@ -128,12 +116,10 @@ impl Backend {
             p.project_name == project_name && p.build.name == build.name && p.run_type == run
         }) {
             let mut process = self.running_processes.remove(index);
-            let id = process.process.id();
-            println!("Killing pid {}", id);
+            let pid = process.process.id();
+            println!("Killing pid {}", pid);
             process.process.kill()?;
-            State::modify(|state| {
-                state.running_processes.retain(|p| p.id != id);
-            });
+            State::remove_running_process_by_pid(pid);
         }
 
         let token = Token(self.next_token);
@@ -157,10 +143,7 @@ impl Backend {
             );
         }
         self.running_processes.push(running_process);
-        State::modify(|s| {
-            s.running_processes
-                .push(StateRunningProcess::new(project_name, run, id));
-        });
+        State::add_running_process(project_name, run, id);
 
         Ok(())
     }
@@ -173,71 +156,37 @@ impl Backend {
             match result {
                 Ok(e) => {
                     let id = self.running_builds[index].process.id();
-                    State::modify(|state| {
-                        let index = state
-                            .running_builds
-                            .iter()
-                            .position(|p| p.id == id)
-                            .unwrap();
-                        match e {
-                            ProcessEvent::Data(StdioChannel::Stdout, e) => {
-                                state.running_builds[index].stdout += &e
-                            }
-                            ProcessEvent::Data(StdioChannel::Stderr, e) => {
-                                state.running_builds[index].stderr += &e
-                            }
-                            ProcessEvent::CommandError(e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                let mut process: StateFinishedBuild =
-                                    state.running_builds.remove(index).into();
-                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
-                                // https://github.com/rust-lang/rust/issues/24135
-                                // https://github.com/rust-lang-nursery/failure/issues/148
-                                // process.error = Some(e);
-                                state.finished_builds.push(process);
-                                finished = true;
-                            }
-                            ProcessEvent::IoError(_, e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                let mut process: StateFinishedBuild =
-                                    state.running_builds.remove(index).into();
-                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
-                                // https://github.com/rust-lang/rust/issues/24135
-                                // https://github.com/rust-lang-nursery/failure/issues/148
-                                // process.error = Some(e);
-                                state.finished_builds.push(process);
-                                finished = true;
-                            }
-                            ProcessEvent::Utf8Error(_, e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                let mut process: StateFinishedBuild =
-                                    state.running_builds.remove(index).into();
-                                // TODO: std::io::Error does not implement clone, and neither does failure::Error
-                                // https://github.com/rust-lang/rust/issues/24135
-                                // https://github.com/rust-lang-nursery/failure/issues/148
-                                // process.error = Some(e);
-                                state.finished_builds.push(process);
-                                finished = true;
-                            }
-                            ProcessEvent::Exit(status) => {
-                                let mut process: StateFinishedBuild =
-                                    state.running_builds.remove(index).into();
-                                process.status = status.code().unwrap_or(0);
-                                state.finished_builds.insert(0, process);
-                                finished = true;
-                                finished_succesfully = status.success();
-                            }
+                    match e {
+                        ProcessEvent::Data(StdioChannel::Stdout, e) => {
+                            State::running_build_add_stdout(id, &e);
                         }
-                    });
+                        ProcessEvent::Data(StdioChannel::Stderr, e) => {
+                            State::running_build_add_stderr(id, &e);
+                        }
+                        ProcessEvent::CommandError(e) => {
+                            let err = e.into();
+                            State::report_error(&err);
+                            State::running_build_terminated(id, &err);
+                            finished = true;
+                        }
+                        ProcessEvent::IoError(_, e) => {
+                            let err = e.into();
+                            State::report_error(&err);
+                            State::running_build_terminated(id, &err);
+                            finished = true;
+                        }
+                        ProcessEvent::Utf8Error(_, e) => {
+                            let err = e.into();
+                            State::report_error(&err);
+                            State::running_build_terminated(id, &err);
+                            finished = true;
+                        }
+                        ProcessEvent::Exit(status) => {
+                            State::running_build_finished(id, status.code().unwrap_or(0));
+                            finished = true;
+                            finished_succesfully = status.success();
+                        }
+                    }
                     if finished {
                         return ProcessResult {
                             finished,
@@ -248,13 +197,7 @@ impl Backend {
                 Err(TryRecvError::Empty) => return ProcessResult::not_finished(),
                 Err(TryRecvError::Disconnected) => {
                     let id = self.running_builds[index].process.id();
-                    State::modify(|state| {
-                        if let Some(index) = state.running_builds.iter().position(|p| p.id == id) {
-                            let process: StateFinishedBuild =
-                                state.running_builds.remove(index).into();
-                            state.finished_builds.push(process);
-                        }
-                    });
+                    State::running_build_terminated(id, &format_err!("Channel disconnected"));
                     return ProcessResult::failed();
                 }
             }
@@ -269,42 +212,29 @@ impl Backend {
             match result {
                 Ok(e) => {
                     let id = self.running_processes[index].process.id();
-                    State::modify(|state| {
-                        let index = state
-                            .running_processes
-                            .iter()
-                            .position(|p| p.id == id)
-                            .unwrap();
-                        match e {
-                            ProcessEvent::Data(StdioChannel::Stdout, e) => {
-                                state.running_processes[index].stdout += &e
-                            }
-                            ProcessEvent::Data(StdioChannel::Stderr, e) => {
-                                state.running_processes[index].stderr += &e
-                            }
-                            ProcessEvent::CommandError(e) | ProcessEvent::IoError(_, e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                state.running_processes.remove(index);
-                                finished = true;
-                            }
-                            ProcessEvent::Utf8Error(_, e) => {
-                                state.errors.push(StateError {
-                                    time: Utc::now(),
-                                    error: e.into(),
-                                });
-                                state.running_processes.remove(index);
-                                finished = true;
-                            }
-                            ProcessEvent::Exit(status) => {
-                                state.running_processes.remove(index);
-                                finished = true;
-                                finished_succesfully = status.success();
-                            }
+                    match e {
+                        ProcessEvent::Data(StdioChannel::Stdout, e) => {
+                            State::running_process_add_stdout(id, &e);
                         }
-                    });
+                        ProcessEvent::Data(StdioChannel::Stderr, e) => {
+                            State::running_process_add_stderr(id, &e);
+                        }
+                        ProcessEvent::CommandError(e) | ProcessEvent::IoError(_, e) => {
+                            let err = e.into();
+                            State::running_process_terminated(id, &err);
+                            finished = true;
+                        }
+                        ProcessEvent::Utf8Error(_, e) => {
+                            let err = e.into();
+                            State::running_process_terminated(id, &err);
+                            finished = true;
+                        }
+                        ProcessEvent::Exit(status) => {
+                            State::running_process_finished(id, status.code().unwrap_or(0));
+                            finished = true;
+                            finished_succesfully = status.success();
+                        }
+                    }
                     if finished {
                         return ProcessResult {
                             finished,
@@ -315,12 +245,7 @@ impl Backend {
                 Err(TryRecvError::Empty) => return ProcessResult::not_finished(),
                 Err(TryRecvError::Disconnected) => {
                     let id = self.running_builds[index].process.id();
-                    State::modify(|state| {
-                        if let Some(index) = state.running_builds.iter().position(|p| p.id == id) {
-                            let process = state.running_builds.remove(index).into();
-                            state.finished_builds.push(process);
-                        }
-                    });
+                    State::running_process_terminated(id, &format_err!("Channel disconnected"));
                     return ProcessResult::failed();
                 }
             }

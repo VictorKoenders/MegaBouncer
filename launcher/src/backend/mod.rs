@@ -25,13 +25,11 @@ pub enum BackendRequest {
 
 pub fn run(base_dir: &str) -> Result<()> {
     let projects = get_projects(base_dir)?;
-    State::modify(|state| {
-        state.projects = projects.clone();
-    });
+    State::set_projects(projects.clone());
     let mut backend = Backend::new(projects)?;
 
     let (sender, receiver) = channel();
-    State::modify(|s| s.sender = sender);
+    State::set_backend_sender(sender);
     let mut events = Events::with_capacity(10);
     let receiver_token = Token(1);
     backend
@@ -58,12 +56,12 @@ pub fn run(base_dir: &str) -> Result<()> {
                             build_name,
                         } => {
                             if let Err(e) = backend.start_build(project_name, build_name) {
-                                State::report_error(e);
+                                State::report_error(&e);
                             }
                         },
                         BackendRequest::KillProcess(pid) => {
                             if let Err(e) = backend.kill_process(pid) {
-                                State::report_error(e);
+                                State::report_error(&e);
                             }
                         }
                     }
