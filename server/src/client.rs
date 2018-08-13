@@ -1,9 +1,9 @@
 use serde_json::{to_vec, Value};
-use shared::mio::Event;
 use shared::mio::net::TcpStream;
+use shared::mio::Event;
+use std::io::{ErrorKind, Read, Result, Write};
 use std::net::SocketAddr;
 use uuid::Uuid;
-use std::io::{Result, Write, Read, ErrorKind};
 
 /// Holds a reference to a single connected TCP client
 #[derive(Debug)]
@@ -72,13 +72,17 @@ impl Client {
                     self.is_writable = false;
                     Ok(())
                 }
-                Err(e) => Err(e)
-            }
+                Err(e) => Err(e),
+            };
         }
     }
 
     fn identify(&mut self, json: &Value) -> Option<ClientUpdate> {
-        if let Some(name) = json.as_object().and_then(|o| o.get("name")).and_then(|o| o.as_str()) {
+        if let Some(name) = json
+            .as_object()
+            .and_then(|o| o.get("name"))
+            .and_then(|o| o.as_str())
+        {
             self.name = Some(name.to_string());
             Some(ClientUpdate::Identified(name.to_string()))
         } else if let Err(e) = self.send(&::server::make_error("Missing required field 'name'")) {
@@ -90,10 +94,16 @@ impl Client {
     }
 
     fn register_listener(&mut self, json: &Value) -> Option<ClientUpdate> {
-        if let Some(channel) = json.as_object().and_then(|o| o.get("channel")).and_then(|o| o.as_str()) {
+        if let Some(channel) = json
+            .as_object()
+            .and_then(|o| o.get("channel"))
+            .and_then(|o| o.as_str())
+        {
             if let Some(name) = self.name.as_ref() {
                 self.listening_to.push(channel.to_string());
-                return Some(ClientUpdate::Broadcast(::server::make_client_listening_to(name, channel, &self.id)));
+                return Some(ClientUpdate::Broadcast(::server::make_client_listening_to(
+                    name, channel, &self.id,
+                )));
             }
             if let Err(e) = self.send(&::server::make_error("Not identified")) {
                 self.print_error(e);
@@ -140,9 +150,11 @@ impl Client {
                     } else {
                         Some(ClientUpdate::Broadcast(json.clone()))
                     }
-                },
+                }
                 None => {
-                    if let Err(e) = self.send(&::server::make_error("Missing required field 'action'")) {
+                    if let Err(e) =
+                        self.send(&::server::make_error("Missing required field 'action'"))
+                    {
                         self.print_error(e);
                         Some(ClientUpdate::Disconnect)
                     } else {
@@ -170,7 +182,11 @@ impl Client {
                     did_read = true;
                     self.read_buff.extend(&buff[..n]);
                     while let Some(index) = self.read_buff.iter().position(|c| *c == b'\n') {
-                        let line = self.read_buff.drain(..index + 1).take(index - 1).collect::<Vec<_>>();
+                        let line = self
+                            .read_buff
+                            .drain(..index + 1)
+                            .take(index - 1)
+                            .collect::<Vec<_>>();
                         let line = match ::std::str::from_utf8(&line) {
                             Ok(l) => l,
                             Err(e) => {
@@ -187,7 +203,7 @@ impl Client {
                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                     break;
                 }
-                Err(e) => return Err(e)
+                Err(e) => return Err(e),
             }
         }
         Ok(updates)
@@ -199,7 +215,7 @@ impl Client {
     }
 
     /// Update the client with a given event.
-    /// 
+    ///
     /// Specifically,
     /// if the event has the `is_writable` flag set, this will call [Client::process_write].
     /// If the event has the `is_readable` flag set, this will call [Client::process_read].
@@ -207,9 +223,7 @@ impl Client {
         if event.readiness().is_writable() {
             if let Err(e) = self.process_write() {
                 self.print_error(e);
-                return vec![
-                    ClientUpdate::Disconnect
-                ];
+                return vec![ClientUpdate::Disconnect];
             }
         }
         if event.readiness().is_readable() {
@@ -217,9 +231,7 @@ impl Client {
                 Ok(v) => v,
                 Err(e) => {
                     self.print_error(e);
-                    vec![
-                        ClientUpdate::Disconnect
-                    ]
+                    vec![ClientUpdate::Disconnect]
                 }
             }
         } else {
@@ -228,7 +240,7 @@ impl Client {
     }
 
     /// Print a debuggable message about this client.
-    /// 
+    ///
     /// TODO: Implement a central logger for this
     pub fn print_error<T: ::std::fmt::Debug>(&self, e: T) {
         println!("Client {:?} error:", self.address);
@@ -260,7 +272,7 @@ impl ClientUpdate {
     pub fn is_disconnect(&self) -> bool {
         match self {
             ClientUpdate::Disconnect => true,
-            _ => false
+            _ => false,
         }
     }
 }

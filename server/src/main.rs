@@ -36,18 +36,18 @@
 //! ### node.listener.registered
 //! Is generated when a node starts listening to a channel
 
+extern crate error_chain;
 extern crate shared;
 extern crate uuid;
-extern crate error_chain;
 
 /// holds a reference to the clients connected to the server
 pub mod client;
 /// The server logic
 pub mod server;
 
-use shared::serde_json;
 use shared::mio::net::TcpListener;
 use shared::mio_poll_wrapper::Handle;
+use shared::serde_json;
 
 fn main() {
     let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();

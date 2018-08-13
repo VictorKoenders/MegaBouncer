@@ -3,7 +3,7 @@ extern crate mio_extras;
 extern crate shared;
 
 use mio::net::TcpListener;
-use shared::mio_poll_wrapper::{PollWrapper, Handle};
+use shared::mio_poll_wrapper::{Handle, PollWrapper};
 use std::collections::HashMap;
 
 fn main() {

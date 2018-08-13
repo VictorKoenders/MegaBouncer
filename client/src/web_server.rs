@@ -52,7 +52,7 @@ pub fn serve() -> String {
                 .resource("/bundle.js.map", |r| r.method(Method::GET).f(bundle_map))
                 .resource("/ws/", |r| r.f(|req| ws::start(req, Ws)))
         }).bind(addr)
-            .unwrap();
+        .unwrap();
         let addr = server.addrs()[0];
         let url = format!("http://{}", addr);
         sender.send((addr, url)).unwrap();
@@ -76,6 +76,5 @@ fn server_is_up(system: &mut SystemRunner, url: String) -> bool {
             .and_then(|response| {                // <- server http response
                 ::futures::future::ok(response.status().is_success())
             }),
-        )
-        .unwrap()
+        ).unwrap()
 }

@@ -20,7 +20,7 @@ impl Server {
     }
 
     /// Handle an incoming event.
-    /// 
+    ///
     /// Specifically, this will look up the associated [Client] object, and call [Server::handle_updates].
     pub fn handle(&mut self, event: Event) {
         let updates;
@@ -40,7 +40,7 @@ impl Server {
     }
 
     /// Handle a list of updates that were received from a client.
-    /// 
+    ///
     /// Optionally the token of the client can be provided.
     fn handle_updates(
         &mut self,
@@ -57,14 +57,16 @@ impl Server {
                             .as_object_mut()
                             .unwrap()
                             .insert(String::from("sender"), Value::String(name.clone()));
-                        message
-                            .as_object_mut()
-                            .unwrap()
-                            .insert(String::from("sender_id"), Value::String(sender_id.to_string()));
+                        message.as_object_mut().unwrap().insert(
+                            String::from("sender_id"),
+                            Value::String(sender_id.to_string()),
+                        );
                     }
                     let mut err = None;
                     {
-                        if let Some(client) = self.clients.values_mut().find(|c| c.id.to_string() == id) {
+                        if let Some(client) =
+                            self.clients.values_mut().find(|c| c.id.to_string() == id)
+                        {
                             if let Err(e) = client.send(&message) {
                                 err = Some(e.to_string());
                             }
@@ -84,10 +86,10 @@ impl Server {
                             .as_object_mut()
                             .unwrap()
                             .insert(String::from("sender"), Value::String(name.clone()));
-                        message
-                            .as_object_mut()
-                            .unwrap()
-                            .insert(String::from("sender_id"), Value::String(sender_id.to_string()));
+                        message.as_object_mut().unwrap().insert(
+                            String::from("sender_id"),
+                            Value::String(sender_id.to_string()),
+                        );
                     }
                     self.broadcast(&message);
                 }
@@ -183,8 +185,7 @@ impl Server {
                                 ),
                             );
                             Some(Value::Object(map))
-                        })
-                        .collect(),
+                        }).collect(),
                 ),
             );
             map

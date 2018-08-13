@@ -12,13 +12,13 @@ fn main() {
                 sleep(1);
                 println!("{:?}", i + 1);
             }
-        },
+        }
         "abort" => std::process::exit(1),
         "sleep_abort" => {
             sleep(1);
             std::process::exit(1);
         }
-        "finish" => {},
+        "finish" => {}
         "sleep_finish" => sleep(1),
         _ => print_help(),
     }

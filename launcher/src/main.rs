@@ -15,13 +15,13 @@ extern crate mio_extras;
 extern crate shared;
 #[macro_use]
 extern crate failure;
-extern crate uuid;
 extern crate notify;
+extern crate uuid;
 
 mod backend;
+mod filewatcher;
 mod server;
 mod state;
-mod filewatcher;
 
 use clap::{App, Arg};
 use std::thread::spawn;

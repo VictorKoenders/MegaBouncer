@@ -162,8 +162,8 @@ impl<TState: Send + 'static> Client<TState> {
 
     fn run(&mut self) -> Result<(), String> {
         let addr = ([127u8, 0u8, 0u8, 1u8], 6142).into();
-        let stream =
-            TcpStream::connect(&addr).map_err(|e| format!("Could not connect to server: {:?}", e))?;
+        let stream = TcpStream::connect(&addr)
+            .map_err(|e| format!("Could not connect to server: {:?}", e))?;
 
         let name = self.state.name.clone();
         self.write(&Identify(name))?;

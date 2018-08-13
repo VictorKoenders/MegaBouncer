@@ -79,7 +79,9 @@ impl State {
             error: format!("{}", e),
         };
         self.errors.push(error.clone());
-        self.change_sender.send(StateChange::ErrorAdded(error)).expect("Change sender failed");
+        self.change_sender
+            .send(StateChange::ErrorAdded(error))
+            .expect("Change sender failed");
     }
     pub fn report_error(e: &Error) {
         let mut state = STATE.lock().unwrap();
@@ -100,7 +102,10 @@ impl State {
     pub fn set_projects(p: Vec<Project>) {
         let mut state = STATE.lock().unwrap();
         state.projects = p.clone();
-        state.change_sender.send(StateChange::ProjectsSet(p)).expect("Change sender failed");
+        state
+            .change_sender
+            .send(StateChange::ProjectsSet(p))
+            .expect("Change sender failed");
     }
 
     pub fn set_backend_sender(sender: Sender<BackendRequest>) {
@@ -115,7 +120,8 @@ impl State {
             let process = state.running_processes.remove(index);
             state
                 .change_sender
-                .send(StateChange::RunningProcessRemoved(process.uuid)).expect("Change sender failed");
+                .send(StateChange::RunningProcessRemoved(process.uuid))
+                .expect("Change sender failed");
         }
     }
 
@@ -125,7 +131,8 @@ impl State {
         state.running_processes.push(process.clone());
         state
             .change_sender
-            .send(StateChange::RunningProcessAdded(process)).expect("Change sender failed");
+            .send(StateChange::RunningProcessAdded(process))
+            .expect("Change sender failed");
     }
 
     pub fn running_process_add_stdout(pid: u32, addition: &str) {
@@ -165,10 +172,8 @@ impl State {
             let err = format!("{}", err);
             state
                 .change_sender
-                .send(StateChange::RunningProcessTerminated(
-                    process.uuid,
-                    err,
-                )).expect("Change sender failed");
+                .send(StateChange::RunningProcessTerminated(process.uuid, err))
+                .expect("Change sender failed");
         }
     }
 
@@ -176,10 +181,10 @@ impl State {
         let mut state = STATE.lock().unwrap();
         if let Some(index) = state.running_processes.iter().position(|b| b.pid == pid) {
             let mut process = state.running_processes.remove(index);
-            state.change_sender.send(StateChange::RunningProcessFinished(
-                process.uuid,
-                status,
-            )).expect("Change sender failed");
+            state
+                .change_sender
+                .send(StateChange::RunningProcessFinished(process.uuid, status))
+                .expect("Change sender failed");
         }
     }
 }
@@ -191,7 +196,8 @@ impl State {
         state.running_builds.push(build.clone());
         state
             .change_sender
-            .send(StateChange::RunningBuildAdded(build)).expect("Change sender failed");
+            .send(StateChange::RunningBuildAdded(build))
+            .expect("Change sender failed");
     }
 
     pub fn running_build_add_stdout(pid: u32, addition: &str) {
@@ -246,10 +252,12 @@ impl State {
         if let Some(index) = state.running_builds.iter().position(|b| b.pid == pid) {
             let mut process: FinishedBuild = state.running_builds.remove(index).into();
             process.status = status;
-            state.change_sender.send(StateChange::RunningBuildFinished(
-                process.uuid.clone(),
-                status,
-            )).expect("Change sender failed");
+            state
+                .change_sender
+                .send(StateChange::RunningBuildFinished(
+                    process.uuid.clone(),
+                    status,
+                )).expect("Change sender failed");
             state.finished_builds.insert(0, process);
         }
     }

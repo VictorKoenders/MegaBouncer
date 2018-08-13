@@ -1,10 +1,10 @@
-extern crate shared;
 extern crate chrono;
+extern crate shared;
 
+use chrono::NaiveDateTime;
 use shared::mio::net::TcpStream;
 use shared::mio::Token;
 use shared::{ChannelUpdate, Startup};
-use chrono::NaiveDateTime;
 
 fn main() {
     let state = State::default();
@@ -18,21 +18,13 @@ fn main() {
     client.launch();
 }
 
-fn irc_connect(_update: &mut ChannelUpdate<State>) {
+fn irc_connect(_update: &mut ChannelUpdate<State>) {}
 
-}
+fn startup(_data: &mut Startup<State>) {}
 
-fn startup(_data: &mut Startup<State>) {
+fn tcp_received(_update: &mut ChannelUpdate<State>) {}
 
-}
-
-fn tcp_received(_update: &mut ChannelUpdate<State>) {
-
-}
-
-fn tcp_status(_update: &mut ChannelUpdate<State>) {
-
-}
+fn tcp_status(_update: &mut ChannelUpdate<State>) {}
 
 #[derive(Default)]
 pub struct State {

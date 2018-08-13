@@ -9,9 +9,9 @@ pub mod client_state;
 pub mod linereader;
 pub mod messages;
 
-use serde_json::Value;
+use mio::{Event, Token};
 use mio_poll_wrapper::Handle;
-use mio::{Token, Event};
+use serde_json::Value;
 
 /// Checks if the given channel matches any of the channels in the list
 /// Channels match if:

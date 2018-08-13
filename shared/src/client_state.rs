@@ -2,7 +2,7 @@ use client::{ChannelListener, StartupListener, TokenListener};
 use mio::Token;
 use mio_extras::channel::Receiver;
 use mio_poll_wrapper::Handle;
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use ChannelUpdate;
 
@@ -97,10 +97,10 @@ impl<TState: Send> ClientState<TState> {
             emit: update.emit,
             reply: if let Some(sender_id) = sender_id {
                 update
-                .reply
-                .into_iter()
-                .map(|r| (sender_id.clone(), r))
-                .collect()
+                    .reply
+                    .into_iter()
+                    .map(|r| (sender_id.clone(), r))
+                    .collect()
             } else {
                 Vec::new()
             },

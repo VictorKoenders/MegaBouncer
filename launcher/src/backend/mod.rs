@@ -58,7 +58,7 @@ pub fn run(base_dir: &str) -> Result<()> {
                             if let Err(e) = backend.start_build(project_name, build_name) {
                                 State::report_error(&e);
                             }
-                        },
+                        }
                         BackendRequest::KillProcess(pid) => {
                             if let Err(e) = backend.kill_process(pid) {
                                 State::report_error(&e);

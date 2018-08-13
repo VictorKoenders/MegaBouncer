@@ -19,7 +19,7 @@ fn main() {
     client.register_listener("tcp.status", status);
     client.launch();
 }
-fn print_all(update: &mut ChannelUpdate<State>){
+fn print_all(update: &mut ChannelUpdate<State>) {
     println!("{:?}", update.value);
 }
 
@@ -89,10 +89,15 @@ pub struct State {
 
 impl State {
     pub fn get_or_create(&mut self, handle: &mut Handle, host: &str, port: u16) -> &mut Connection {
-        let index = if let Some(index) = self.connections.iter().position(|c| &c.host == host && c.port == port) {
+        let index = if let Some(index) = self
+            .connections
+            .iter()
+            .position(|c| &c.host == host && c.port == port)
+        {
             index
         } else {
-            self.connections.push(Connection::new(handle, host.to_string(), port));
+            self.connections
+                .push(Connection::new(handle, host.to_string(), port));
             self.connections.len() - 1
         };
         &mut self.connections[index]
