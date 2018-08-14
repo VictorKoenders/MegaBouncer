@@ -1,11 +1,12 @@
+use actix::Recipient;
 use backend::{BackendRequest, Project, RunType};
 use chrono::{DateTime, Utc};
 use failure::Error;
-use mio_extras::channel::{channel as mio_channel, Sender as MioSender};
+use mio_extras::channel::{channel, Sender};
 use std::fmt;
-use std::sync::mpsc::{channel as std_channel, Sender as StdSender};
 use std::sync::Mutex;
 use uuid::Uuid;
+use Result;
 
 #[derive(Serialize)]
 pub struct State {
@@ -13,14 +14,14 @@ pub struct State {
     pub running_builds: Vec<RunningBuild>,
     pub finished_builds: Vec<FinishedBuild>,
     #[serde(skip_serializing)]
-    pub backend_sender: MioSender<BackendRequest>,
+    pub backend_sender: Sender<BackendRequest>,
     #[serde(skip_serializing)]
-    pub change_sender: StdSender<StateChange>,
+    pub change_sender: Option<Recipient<StateChange>>,
     pub projects: Vec<Project>,
     pub errors: Vec<StateError>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Message, Serialize)]
 pub enum StateChange {
     ErrorAdded(StateError),
 
@@ -67,8 +68,8 @@ lazy_static! {
         running_builds: Vec::new(),
         finished_builds: Vec::new(),
         running_processes: Vec::new(),
-        backend_sender: mio_channel().0,
-        change_sender: std_channel().0,
+        backend_sender: channel().0,
+        change_sender: None,
         projects: Vec::new(),
         errors: Vec::new(),
     });
@@ -81,17 +82,15 @@ impl State {
             error: format!("{}", e),
         };
         self.errors.push(error.clone());
-        self.change_sender
-            .send(StateChange::ErrorAdded(error))
-            .expect("Change sender failed");
+        self.emit_change(StateChange::ErrorAdded(error));
     }
     pub fn report_error(e: &Error) {
         let mut state = STATE.lock().unwrap();
         state.report_error_internal(&e);
     }
-    pub fn get<F, T>(cb: F) -> Result<T, Error>
+    pub fn get<F, T>(cb: F) -> Result<T>
     where
-        F: FnOnce(&State) -> Result<T, Error>,
+        F: FnOnce(&State) -> Result<T>,
     {
         let mut state = STATE.lock().unwrap();
         let result = cb(&state);
@@ -104,20 +103,25 @@ impl State {
     pub fn set_projects(p: Vec<Project>) {
         let mut state = STATE.lock().unwrap();
         state.projects = p.clone();
-        state
-            .change_sender
-            .send(StateChange::ProjectsSet(p))
-            .expect("Change sender failed");
+        state.emit_change(StateChange::ProjectsSet(p));
     }
 
-    pub fn set_backend_sender(sender: MioSender<BackendRequest>) {
+    pub fn set_backend_sender(sender: Sender<BackendRequest>) {
         let mut state = STATE.lock().unwrap();
         state.backend_sender = sender;
     }
 
-    pub fn set_change_sender(sender: StdSender<StateChange>) {
+    pub fn set_change_sender(sender: Recipient<StateChange>) {
         let mut state = STATE.lock().unwrap();
-        state.change_sender = sender;
+        state.change_sender = Some(sender);
+    }
+
+    fn emit_change(&mut self, change: StateChange) {
+        if let Some(change_sender) = &self.change_sender {
+            change_sender
+                .do_send(change)
+                .expect("Could not send change to change_sender");
+        }
     }
 }
 impl State {
@@ -125,10 +129,7 @@ impl State {
         let mut state = STATE.lock().unwrap();
         while let Some(index) = state.running_processes.iter().position(|p| p.pid == pid) {
             let process = state.running_processes.remove(index);
-            state
-                .change_sender
-                .send(StateChange::RunningProcessRemoved(process.uuid))
-                .expect("Change sender failed");
+            state.emit_change(StateChange::RunningProcessRemoved(process.uuid));
         }
     }
 
@@ -136,10 +137,7 @@ impl State {
         let mut state = STATE.lock().unwrap();
         let process = RunningProcess::new(project_name, run_type, id);
         state.running_processes.push(process.clone());
-        state
-            .change_sender
-            .send(StateChange::RunningProcessAdded(process))
-            .expect("Change sender failed");
+        state.emit_change(StateChange::RunningProcessAdded(process));
     }
 
     pub fn running_process_add_stdout(pid: u32, addition: &str) {
@@ -153,7 +151,7 @@ impl State {
             ));
         }
         if let Some(msg) = msg {
-            state.change_sender.send(msg).expect("Change sender failed");
+            state.emit_change(msg);
         }
     }
 
@@ -168,7 +166,7 @@ impl State {
             ));
         }
         if let Some(msg) = msg {
-            state.change_sender.send(msg).expect("Change sender failed");
+            state.emit_change(msg);
         }
     }
 
@@ -177,10 +175,7 @@ impl State {
         if let Some(index) = state.running_processes.iter().position(|b| b.pid == pid) {
             let process = state.running_processes.remove(index);
             let err = format!("{}", err);
-            state
-                .change_sender
-                .send(StateChange::RunningProcessTerminated(process.uuid, err))
-                .expect("Change sender failed");
+            state.emit_change(StateChange::RunningProcessTerminated(process.uuid, err));
         }
     }
 
@@ -188,10 +183,7 @@ impl State {
         let mut state = STATE.lock().unwrap();
         if let Some(index) = state.running_processes.iter().position(|b| b.pid == pid) {
             let mut process = state.running_processes.remove(index);
-            state
-                .change_sender
-                .send(StateChange::RunningProcessFinished(process.uuid, status))
-                .expect("Change sender failed");
+            state.emit_change(StateChange::RunningProcessFinished(process.uuid, status));
         }
     }
 }
@@ -201,10 +193,7 @@ impl State {
         let build = RunningBuild::new(project_name, build_name, id);
 
         state.running_builds.push(build.clone());
-        state
-            .change_sender
-            .send(StateChange::RunningBuildAdded(build))
-            .expect("Change sender failed");
+        state.emit_change(StateChange::RunningBuildAdded(build));
     }
 
     pub fn running_build_add_stdout(pid: u32, addition: &str) {
@@ -218,7 +207,7 @@ impl State {
             ));
         }
         if let Some(msg) = msg {
-            state.change_sender.send(msg).expect("Change sender failed");
+            state.emit_change(msg);
         }
     }
 
@@ -233,7 +222,7 @@ impl State {
             ));
         }
         if let Some(msg) = msg {
-            state.change_sender.send(msg).expect("Change sender failed");
+            state.emit_change(msg);
         }
     }
 
@@ -244,12 +233,10 @@ impl State {
             let mut finished_build: FinishedBuild = build.into();
             let err = format!("{}", err);
             finished_build.error = Some(err.clone());
-            state
-                .change_sender
-                .send(StateChange::RunningBuildTerminated(
-                    finished_build.uuid.clone(),
-                    err,
-                )).expect("Change sender failed");
+            state.emit_change(StateChange::RunningBuildTerminated(
+                finished_build.uuid.clone(),
+                err,
+            ));
             state.finished_builds.insert(0, finished_build);
         }
     }
@@ -259,12 +246,10 @@ impl State {
         if let Some(index) = state.running_builds.iter().position(|b| b.pid == pid) {
             let mut process: FinishedBuild = state.running_builds.remove(index).into();
             process.status = status;
-            state
-                .change_sender
-                .send(StateChange::RunningBuildFinished(
-                    process.uuid.clone(),
-                    status,
-                )).expect("Change sender failed");
+            state.emit_change(StateChange::RunningBuildFinished(
+                process.uuid.clone(),
+                status,
+            ));
             state.finished_builds.insert(0, process);
         }
     }

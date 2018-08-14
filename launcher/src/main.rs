@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate actix;
 extern crate actix_web;
 extern crate mio;
