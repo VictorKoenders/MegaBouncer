@@ -12,6 +12,7 @@ use Result;
 pub struct State {
     pub running_processes: Vec<RunningProcess>,
     pub running_builds: Vec<RunningBuild>,
+    pub finished_processes: Vec<FinishedProcess>,
     pub finished_builds: Vec<FinishedBuild>,
     #[serde(skip_serializing)]
     pub backend_sender: Sender<BackendRequest>,
@@ -28,7 +29,6 @@ pub enum StateChange {
     ProjectsSet(Vec<Project>),
 
     RunningProcessAdded(RunningProcess),
-    RunningProcessRemoved(Uuid),
     RunningProcessStdout(Uuid, String),
     RunningProcessStderr(Uuid, String),
     RunningProcessTerminated(Uuid, String),
@@ -57,6 +57,7 @@ impl fmt::Debug for State {
             .field("running_builds", &self.running_builds)
             .field("finished_builds", &self.finished_builds)
             .field("running_processes", &self.running_processes)
+            .field("finished_processes", &self.finished_processes)
             .field("projects", &self.projects)
             .field("errors", &self.errors)
             .finish()
@@ -68,6 +69,7 @@ lazy_static! {
         running_builds: Vec::new(),
         finished_builds: Vec::new(),
         running_processes: Vec::new(),
+        finished_processes: Vec::new(),
         backend_sender: channel().0,
         change_sender: None,
         projects: Vec::new(),
@@ -125,14 +127,6 @@ impl State {
     }
 }
 impl State {
-    pub fn remove_running_process_by_pid(pid: u32) {
-        let mut state = STATE.lock().unwrap();
-        while let Some(index) = state.running_processes.iter().position(|p| p.pid == pid) {
-            let process = state.running_processes.remove(index);
-            state.emit_change(StateChange::RunningProcessRemoved(process.uuid));
-        }
-    }
-
     pub fn add_running_process(project_name: String, run_type: RunType, id: u32) {
         let mut state = STATE.lock().unwrap();
         let process = RunningProcess::new(project_name, run_type, id);
@@ -175,7 +169,10 @@ impl State {
         if let Some(index) = state.running_processes.iter().position(|b| b.pid == pid) {
             let process = state.running_processes.remove(index);
             let err = format!("{}", err);
-            state.emit_change(StateChange::RunningProcessTerminated(process.uuid, err));
+            let mut process: FinishedProcess = process.into();
+            process.error = Some(err.clone());
+            state.emit_change(StateChange::RunningProcessTerminated(process.uuid.clone(), err));
+            state.finished_processes.insert(0, process);
         }
     }
 
@@ -183,7 +180,10 @@ impl State {
         let mut state = STATE.lock().unwrap();
         if let Some(index) = state.running_processes.iter().position(|b| b.pid == pid) {
             let mut process = state.running_processes.remove(index);
-            state.emit_change(StateChange::RunningProcessFinished(process.uuid, status));
+            let mut process: FinishedProcess = process.into();
+            process.status = status;
+            state.emit_change(StateChange::RunningProcessFinished(process.uuid.clone(), status));
+            state.finished_processes.insert(0, process);
         }
     }
 }
@@ -274,6 +274,31 @@ impl RunningProcess {
             pid,
             stdout: String::new(),
             stderr: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FinishedProcess {
+    pub uuid: Uuid,
+    pub directory: String,
+    pub run_type: RunType,
+    pub stdout: String,
+    pub stderr: String,
+    pub status: i32,
+    pub error: Option<String>,
+}
+
+impl From<RunningProcess> for FinishedProcess {
+    fn from(p: RunningProcess) -> FinishedProcess {
+        FinishedProcess {
+            uuid: p.uuid,
+            directory: p.directory,
+            run_type: p.run_type,
+            stdout: p.stdout,
+            stderr: p.stderr,
+            status: 0,
+            error: None,
         }
     }
 }

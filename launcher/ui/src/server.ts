@@ -4,7 +4,7 @@ declare module server {
         uuid: string;
         directory: string;
         run_type: string;
-        id: number;
+        pid: number;
         stdout: string;
         stderr: string;
     }
@@ -14,7 +14,7 @@ declare module server {
         directory: string;
         build: string;
         started_on: string;
-        id: number;
+        pid: number;
         stdout: string;
         stderr: string;
     }
@@ -27,7 +27,7 @@ declare module server {
         ended_on: string;
         status: number;
         error: string | null;
-        id: number;
+        pid: number;
         stdout: string;
         stderr: string;
     }
@@ -67,6 +67,24 @@ declare module server {
         errors: Error[];
     }
 
+    export interface ChangeState {
+        ErrorAdded?: Error;
+        ProjectsSet?: Project[];
+
+        RunningProcessAdded?: RunningProcess;
+        RunningProcessRemoved?: string;
+        RunningProcessStdout?: [string, string];
+        RunningProcessStderr?: [string, string];
+        RunningProcessTerminated?: [string, string];
+        RunningProcessFinished?: [string, number];
+
+        RunningBuildAdded?: RunningBuild;
+        RunningBuildStdout?: [string, string];
+        RunningBuildStderr?: [string, string];
+        RunningBuildTerminated?: [string, string];
+        RunningBuildFinished?: [string, number];
+
+    }
 }
 
 

@@ -2,50 +2,169 @@ import * as React from "react";
 
 export interface Props { }
 export interface State {
-    state: server.State | null,
+    running_processes: server.RunningProcess[];
+    running_builds: server.RunningBuild[];
+    finished_builds: server.FinishedBuild[];
+    projects: server.Project[];
+    errors: server.Error[];
     open_uuids: string[],
+    socket: WebSocket | null,
 }
 
 export class Root extends React.Component<Props, State> {
-    interval: number;
-
     constructor(props: Props, context?: any) {
         super(props, context);
+        const socket = this.start_websocket();
         this.state = {
-            state: null,
+            running_processes: [],
+            running_builds: [],
+            finished_builds: [],
+            projects: [],
+            errors: [],
             open_uuids: [],
+            socket,
         };
-        this.interval = 0;
     }
 
-    componentWillMount() {
-        this.fetch();
+    start_websocket(): WebSocket {
+        const socket = new WebSocket("ws://" + document.location.host + "/ws");
+        socket.onclose = this.ws_close.bind(this);
+        socket.onopen = this.ws_open.bind(this);
+        socket.onmessage = this.ws_message.bind(this);
+        socket.onerror = this.ws_error.bind(this);
+        return socket;
     }
 
-    fetch() {
-        fetch("/api/state")
-            .then(r => r.json())
-            .then((r: server.State) => {
-                if (this.state.state) {
-                    let running_frontend_build = this.state.state.running_builds.find(b => b.directory == "launcher" && b.build == "webpack");
-                    if (running_frontend_build) {
-                        let finished_build = r.finished_builds.find(b => b.uuid == running_frontend_build!.uuid);
-                        if (finished_build && finished_build.error === null && finished_build.status === 0) {
-                            document.location.reload();
-                        }
-                    }
-                }
-                this.setState({
-                    state: r
-                });
-                clearTimeout(this.interval);
-                this.interval = setTimeout(this.fetch.bind(this), 1000);
-            })
-            .catch(e => {
-                console.error(e);
-                clearTimeout(this.interval);
-                this.interval = setTimeout(this.fetch.bind(this), 1000);
+    ws_close(ev: CloseEvent) {
+        console.log("Websocket closed, reconnecting in 5 secs", ev);
+        this.setState({ socket: null });
+        setTimeout(() => {
+            if (this.state.socket === null) {
+                const socket = this.start_websocket();
+                this.setState({ socket });
+            }
+        }, 5000);
+    }
+
+    ws_error(ev: Event) {
+        console.log("Websocket error", ev);
+    }
+
+    ws_open(ev: Event) {
+        console.log("Websocket opened");
+    }
+
+    ws_message(ev: MessageEvent) {
+        const json = JSON.parse(ev.data);
+        if (Array.isArray(json.running_processes)) {
+            this.setState(json);
+            return;
+        }
+        const change = json as server.ChangeState;
+        if (change.ErrorAdded) {
+            let errors = this.state.errors;
+            errors.splice(0, 0, change.ErrorAdded);
+            this.setState({ errors });
+        } else if (change.ProjectsSet) {
+            this.setState({
+                projects: change.ProjectsSet,
             });
+
+            // Processes
+        } else if (change.RunningProcessAdded) {
+            let running_processes = this.state.running_processes;
+            running_processes.push(change.RunningProcessAdded);
+            this.setState({ running_processes });
+        } else if (change.RunningProcessRemoved) {
+            let running_processes = this.state.running_processes;
+            let index = running_processes.findIndex(p => p.uuid == change.RunningProcessRemoved);
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes });
+            }
+        } else if (change.RunningProcessStdout) {
+            let running_processes = this.state.running_processes;
+            let index = running_processes.findIndex(p => p.uuid == change.RunningProcessStdout![0]);
+            if (index !== null) {
+                running_processes[index].stdout += change.RunningProcessStdout[1];
+                this.setState({ running_processes });
+            }
+        } else if (change.RunningProcessStderr) {
+            let running_processes = this.state.running_processes;
+            let index = running_processes.findIndex(p => p.uuid == change.RunningProcessStderr![0]);
+            if (index !== null) {
+                running_processes[index].stderr += change.RunningProcessStderr[1];
+                this.setState({ running_processes });
+            }
+        } else if (change.RunningProcessTerminated) {
+            let running_processes = this.state.running_processes;
+            let index = running_processes.findIndex(p => p.uuid == change.RunningProcessTerminated![0]);
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes });
+            }
+        } else if (change.RunningProcessFinished) {
+            let running_processes = this.state.running_processes;
+            let index = running_processes.findIndex(p => p.uuid == change.RunningProcessFinished![0]);
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes });
+            }
+
+            // Builds
+        } else if (change.RunningBuildAdded) {
+            let running_builds = this.state.running_builds;
+            running_builds.push(change.RunningBuildAdded);
+            this.setState({ running_builds });
+        } else if (change.RunningBuildStdout) {
+            let running_builds = this.state.running_builds;
+            let index = running_builds.findIndex(b => b.uuid == change.RunningBuildStdout![0]);
+            if (index !== null) {
+                running_builds[index].stdout += change.RunningBuildStdout[1];
+                this.setState({ running_builds });
+            }
+        } else if (change.RunningBuildStderr) {
+            let running_builds = this.state.running_builds;
+            let index = running_builds.findIndex(b => b.uuid == change.RunningBuildStderr![0]);
+            if (index !== null) {
+                running_builds[index].stderr += change.RunningBuildStderr[1];
+                this.setState({ running_builds });
+            }
+        } else if (change.RunningBuildTerminated) {
+            let running_builds = this.state.running_builds;
+            let index = running_builds.findIndex(b => b.uuid == change.RunningBuildTerminated![0]);
+            if (index !== null) {
+                let running_build = running_builds.splice(index, 1)[0];
+                let finished_builds = this.state.finished_builds;
+
+                let finished_build: server.FinishedBuild = {
+                    ended_on: new Date().toISOString(),
+                    status: -1,
+                    error: change.RunningBuildTerminated[1],
+                    ...running_build
+                };
+                finished_builds.splice(0, 0, finished_build);
+                this.setState({ running_builds, finished_builds });
+            }
+        } else if (change.RunningBuildFinished) {
+            let running_builds = this.state.running_builds;
+            let index = running_builds.findIndex(b => b.uuid == change.RunningBuildFinished![0]);
+            if (index !== null) {
+                let running_build = running_builds.splice(index, 1)[0];
+                let finished_builds = this.state.finished_builds;
+
+                let finished_build: server.FinishedBuild = {
+                    ended_on: new Date().toISOString(),
+                    status: change.RunningBuildFinished[1],
+                    error: null,
+                    ...running_build
+                };
+                finished_builds.splice(0, 0, finished_build);
+                this.setState({ running_builds, finished_builds });
+            }
+        } else {
+            console.log("Unknown server command", change);
+        }
     }
 
     render_time(diff: number) {
@@ -128,14 +247,14 @@ export class Root extends React.Component<Props, State> {
         if (is_open) {
             return <div key={index}>
                 <p onClick={this.toggle_open.bind(this, process.uuid)}>
-                    <b>{process.directory}</b> <a href="#" onClick={this.kill_process.bind(this, process.id)}>&times;</a>
+                    <b>{process.directory}</b> <a href="#" onClick={this.kill_process.bind(this, process.pid)}>&times;</a>
                 </p>
                 <pre>{process.stdout}</pre>
                 <pre>{process.stderr}</pre>
             </div>;
         } else {
             return <p key={index} onClick={this.toggle_open.bind(this, process.uuid)}>
-                <b>{process.directory}</b> <a href="#" onClick={this.kill_process.bind(this, process.id)}>&times;</a>
+                <b>{process.directory}</b> <a href="#" onClick={this.kill_process.bind(this, process.pid)}>&times;</a>
             </p>;
         }
     }
@@ -144,11 +263,14 @@ export class Root extends React.Component<Props, State> {
         ev.preventDefault();
         ev.stopPropagation();
 
-        fetch("/api/kill/" + id).then(r => r.text()).then(r => {
-            if (r !== "Ok") {
-                alert("Could not kill process\n" + r);
-            }
-        });
+        if (this.state.socket) {
+            console.log(JSON.stringify({
+                kill: id
+            }));
+            this.state.socket.send(JSON.stringify({
+                kill: id
+            }));
+        }
 
         return false;
     }
@@ -179,11 +301,11 @@ export class Root extends React.Component<Props, State> {
         ev.preventDefault();
         ev.stopPropagation();
 
-        fetch("/api/build/start/" + project.name + "/" + build.name).then(r => r.text()).then(t => {
-            if (t != "Ok") {
-                alert("Could not start build\n" + t);
-            }
-        });
+        if (this.state.socket) {
+            this.state.socket.send(JSON.stringify({
+                start: [project.name, build.name]
+            }));
+        }
 
         return false;
     }
@@ -196,28 +318,27 @@ export class Root extends React.Component<Props, State> {
     }
 
     render() {
-        if (!this.state.state) return <></>;
         return <>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'row', borderBottom: '1px solid #555' }}>
                 <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
                     <h2>Processes:</h2>
-                    {this.state.state.running_processes.map(this.render_process.bind(this))}
+                    {this.state.running_processes.map(this.render_process.bind(this))}
                 </div>
                 <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
-                    {this.state.state.errors.map(this.render_error.bind(this))}
+                    {this.state.errors.map(this.render_error.bind(this))}
                 </div>
                 <div style={{ flex: 1, overflow: "auto", padding: 5 }}>
-                    {this.state.state.projects.map(this.render_project.bind(this))}
+                    {this.state.projects.map(this.render_project.bind(this))}
                 </div>
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'row' }}>
                 <div style={{ flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 }}>
                     <h2>Running:</h2>
-                    {this.state.state.running_builds.map(this.render_running_build.bind(this))}
+                    {this.state.running_builds.map(this.render_running_build.bind(this))}
                 </div>
                 <div style={{ flex: 1, overflow: "auto", padding: 5 }}>
                     <h2>Finished:</h2>
-                    {this.state.state.finished_builds.map(this.render_finished_build.bind(this))}
+                    {this.state.finished_builds.map(this.render_finished_build.bind(this))}
                 </div>
             </div>
         </>;

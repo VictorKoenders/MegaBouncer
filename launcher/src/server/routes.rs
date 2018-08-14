@@ -1,9 +1,9 @@
-use actix_web::{fs::NamedFile, HttpRequest, Responder};
-use backend::BackendRequest;
-use state::State;
-use Result;
 use super::ServerState;
+use actix_web::{fs::NamedFile, HttpRequest, Responder};
+use state::State;
+use serde_json;
 
+/*
 #[deprecated(note = "Use websockets instead")]
 pub fn trigger_build(req: &HttpRequest<ServerState>) -> impl Responder {
     let project_name = req
@@ -32,8 +32,9 @@ pub fn kill(req: &HttpRequest<ServerState>) -> Result<&'static str> {
             .map_err(Into::into)
     }).map(|_| "Ok")
 }
+*/
 pub fn status(_req: &HttpRequest<ServerState>) -> impl Responder {
-    State::get(|state| ::serde_json::to_string_pretty(&state).map_err(Into::into))
+    State::get(|state| serde_json::to_string_pretty(&state).map_err(Into::into))
 }
 
 pub fn index(_req: &HttpRequest<ServerState>) -> impl Responder {

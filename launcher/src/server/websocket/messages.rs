@@ -1,5 +1,5 @@
-use actix::Addr;
 use super::WebsocketClient;
+use actix::Addr;
 
 #[derive(Message)]
 #[rtype(usize)]
@@ -14,6 +14,9 @@ pub struct Disconnect {
 
 #[derive(Message)]
 pub struct BroadcastStateChange(pub String);
+
+#[derive(Message)]
+pub struct BroadcastInitialState(pub String);
 
 /*
 #[derive(Debug, Message)]

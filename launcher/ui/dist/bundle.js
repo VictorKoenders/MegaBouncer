@@ -105,47 +105,167 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
+var __assign = (this && this.__assign) || Object.assign || function(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+            t[p] = s[p];
+    }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var React = __webpack_require__(/*! react */ "react");
 var Root = /** @class */ (function (_super) {
     __extends(Root, _super);
     function Root(props, context) {
         var _this = _super.call(this, props, context) || this;
+        var socket = _this.start_websocket();
         _this.state = {
-            state: null,
+            running_processes: [],
+            running_builds: [],
+            finished_builds: [],
+            projects: [],
+            errors: [],
             open_uuids: [],
+            socket: socket,
         };
-        _this.interval = 0;
         return _this;
     }
-    Root.prototype.componentWillMount = function () {
-        this.fetch();
+    Root.prototype.start_websocket = function () {
+        var socket = new WebSocket("ws://" + document.location.host + "/ws");
+        socket.onclose = this.ws_close.bind(this);
+        socket.onopen = this.ws_open.bind(this);
+        socket.onmessage = this.ws_message.bind(this);
+        socket.onerror = this.ws_error.bind(this);
+        return socket;
     };
-    Root.prototype.fetch = function () {
+    Root.prototype.ws_close = function (ev) {
         var _this = this;
-        fetch("/api/state")
-            .then(function (r) { return r.json(); })
-            .then(function (r) {
-            if (_this.state.state) {
-                var running_frontend_build_1 = _this.state.state.running_builds.find(function (b) { return b.directory == "launcher" && b.build == "webpack"; });
-                if (running_frontend_build_1) {
-                    var finished_build = r.finished_builds.find(function (b) { return b.uuid == running_frontend_build_1.uuid; });
-                    if (finished_build && finished_build.error === null && finished_build.status === 0) {
-                        document.location.reload();
-                    }
-                }
+        console.log("Websocket closed, reconnecting in 5 secs", ev);
+        this.setState({ socket: null });
+        setTimeout(function () {
+            if (_this.state.socket === null) {
+                var socket = _this.start_websocket();
+                _this.setState({ socket: socket });
             }
-            _this.setState({
-                state: r
+        }, 5000);
+    };
+    Root.prototype.ws_error = function (ev) {
+        console.log("Websocket error", ev);
+    };
+    Root.prototype.ws_open = function (ev) {
+        console.log("Websocket opened");
+    };
+    Root.prototype.ws_message = function (ev) {
+        var json = JSON.parse(ev.data);
+        if (Array.isArray(json.running_processes)) {
+            this.setState(json);
+            return;
+        }
+        var change = json;
+        if (change.ErrorAdded) {
+            var errors = this.state.errors;
+            errors.splice(0, 0, change.ErrorAdded);
+            this.setState({ errors: errors });
+        }
+        else if (change.ProjectsSet) {
+            this.setState({
+                projects: change.ProjectsSet,
             });
-            clearTimeout(_this.interval);
-            _this.interval = setTimeout(_this.fetch.bind(_this), 1000);
-        })
-            .catch(function (e) {
-            console.error(e);
-            clearTimeout(_this.interval);
-            _this.interval = setTimeout(_this.fetch.bind(_this), 1000);
-        });
+            // Processes
+        }
+        else if (change.RunningProcessAdded) {
+            var running_processes = this.state.running_processes;
+            running_processes.push(change.RunningProcessAdded);
+            this.setState({ running_processes: running_processes });
+        }
+        else if (change.RunningProcessRemoved) {
+            var running_processes = this.state.running_processes;
+            var index = running_processes.findIndex(function (p) { return p.uuid == change.RunningProcessRemoved; });
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes: running_processes });
+            }
+        }
+        else if (change.RunningProcessStdout) {
+            var running_processes = this.state.running_processes;
+            var index = running_processes.findIndex(function (p) { return p.uuid == change.RunningProcessStdout[0]; });
+            if (index !== null) {
+                running_processes[index].stdout += change.RunningProcessStdout[1];
+                this.setState({ running_processes: running_processes });
+            }
+        }
+        else if (change.RunningProcessStderr) {
+            var running_processes = this.state.running_processes;
+            var index = running_processes.findIndex(function (p) { return p.uuid == change.RunningProcessStderr[0]; });
+            if (index !== null) {
+                running_processes[index].stderr += change.RunningProcessStderr[1];
+                this.setState({ running_processes: running_processes });
+            }
+        }
+        else if (change.RunningProcessTerminated) {
+            var running_processes = this.state.running_processes;
+            var index = running_processes.findIndex(function (p) { return p.uuid == change.RunningProcessTerminated[0]; });
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes: running_processes });
+            }
+        }
+        else if (change.RunningProcessFinished) {
+            var running_processes = this.state.running_processes;
+            var index = running_processes.findIndex(function (p) { return p.uuid == change.RunningProcessFinished[0]; });
+            if (index !== null) {
+                running_processes.splice(index, 1);
+                this.setState({ running_processes: running_processes });
+            }
+            // Builds
+        }
+        else if (change.RunningBuildAdded) {
+            var running_builds = this.state.running_builds;
+            running_builds.push(change.RunningBuildAdded);
+            this.setState({ running_builds: running_builds });
+        }
+        else if (change.RunningBuildStdout) {
+            var running_builds = this.state.running_builds;
+            var index = running_builds.findIndex(function (b) { return b.uuid == change.RunningBuildStdout[0]; });
+            if (index !== null) {
+                running_builds[index].stdout += change.RunningBuildStdout[1];
+                this.setState({ running_builds: running_builds });
+            }
+        }
+        else if (change.RunningBuildStderr) {
+            var running_builds = this.state.running_builds;
+            var index = running_builds.findIndex(function (b) { return b.uuid == change.RunningBuildStderr[0]; });
+            if (index !== null) {
+                running_builds[index].stderr += change.RunningBuildStderr[1];
+                this.setState({ running_builds: running_builds });
+            }
+        }
+        else if (change.RunningBuildTerminated) {
+            var running_builds = this.state.running_builds;
+            var index = running_builds.findIndex(function (b) { return b.uuid == change.RunningBuildTerminated[0]; });
+            if (index !== null) {
+                var running_build = running_builds.splice(index, 1)[0];
+                var finished_builds = this.state.finished_builds;
+                var finished_build = __assign({ ended_on: new Date().toISOString(), status: -1, error: change.RunningBuildTerminated[1] }, running_build);
+                finished_builds.splice(0, 0, finished_build);
+                this.setState({ running_builds: running_builds, finished_builds: finished_builds });
+            }
+        }
+        else if (change.RunningBuildFinished) {
+            var running_builds = this.state.running_builds;
+            var index = running_builds.findIndex(function (b) { return b.uuid == change.RunningBuildFinished[0]; });
+            if (index !== null) {
+                var running_build = running_builds.splice(index, 1)[0];
+                var finished_builds = this.state.finished_builds;
+                var finished_build = __assign({ ended_on: new Date().toISOString(), status: change.RunningBuildFinished[1], error: null }, running_build);
+                finished_builds.splice(0, 0, finished_build);
+                this.setState({ running_builds: running_builds, finished_builds: finished_builds });
+            }
+        }
+        else {
+            console.log("Unknown server command", change);
+        }
     };
     Root.prototype.render_time = function (diff) {
         diff = Math.ceil(diff / 1000);
@@ -237,7 +357,7 @@ var Root = /** @class */ (function (_super) {
                 React.createElement("p", { onClick: this.toggle_open.bind(this, process.uuid) },
                     React.createElement("b", null, process.directory),
                     " ",
-                    React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.id) }, "\u00D7")),
+                    React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.pid) }, "\u00D7")),
                 React.createElement("pre", null, process.stdout),
                 React.createElement("pre", null, process.stderr));
         }
@@ -245,17 +365,20 @@ var Root = /** @class */ (function (_super) {
             return React.createElement("p", { key: index, onClick: this.toggle_open.bind(this, process.uuid) },
                 React.createElement("b", null, process.directory),
                 " ",
-                React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.id) }, "\u00D7"));
+                React.createElement("a", { href: "#", onClick: this.kill_process.bind(this, process.pid) }, "\u00D7"));
         }
     };
     Root.prototype.kill_process = function (id, ev) {
         ev.preventDefault();
         ev.stopPropagation();
-        fetch("/api/kill/" + id).then(function (r) { return r.text(); }).then(function (r) {
-            if (r !== "Ok") {
-                alert("Could not kill process\n" + r);
-            }
-        });
+        if (this.state.socket) {
+            console.log(JSON.stringify({
+                kill: id
+            }));
+            this.state.socket.send(JSON.stringify({
+                kill: id
+            }));
+        }
         return false;
     };
     Root.prototype.render_project = function (project, index) {
@@ -286,11 +409,11 @@ var Root = /** @class */ (function (_super) {
     Root.prototype.start_build = function (project, build, ev) {
         ev.preventDefault();
         ev.stopPropagation();
-        fetch("/api/build/start/" + project.name + "/" + build.name).then(function (r) { return r.text(); }).then(function (t) {
-            if (t != "Ok") {
-                alert("Could not start build\n" + t);
-            }
-        });
+        if (this.state.socket) {
+            this.state.socket.send(JSON.stringify({
+                start: [project.name, build.name]
+            }));
+        }
         return false;
     };
     Root.prototype.render_error = function (err, index) {
@@ -302,22 +425,20 @@ var Root = /** @class */ (function (_super) {
             err.error);
     };
     Root.prototype.render = function () {
-        if (!this.state.state)
-            return React.createElement(React.Fragment, null);
         return React.createElement(React.Fragment, null,
             React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'row', borderBottom: '1px solid #555' } },
                 React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } },
                     React.createElement("h2", null, "Processes:"),
-                    this.state.state.running_processes.map(this.render_process.bind(this))),
-                React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } }, this.state.state.errors.map(this.render_error.bind(this))),
-                React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 5 } }, this.state.state.projects.map(this.render_project.bind(this)))),
+                    this.state.running_processes.map(this.render_process.bind(this))),
+                React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } }, this.state.errors.map(this.render_error.bind(this))),
+                React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 5 } }, this.state.projects.map(this.render_project.bind(this)))),
             React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'row' } },
                 React.createElement("div", { style: { flex: 1, overflow: "auto", borderRight: '1px solid #555', padding: 5 } },
                     React.createElement("h2", null, "Running:"),
-                    this.state.state.running_builds.map(this.render_running_build.bind(this))),
+                    this.state.running_builds.map(this.render_running_build.bind(this))),
                 React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 5 } },
                     React.createElement("h2", null, "Finished:"),
-                    this.state.state.finished_builds.map(this.render_finished_build.bind(this)))));
+                    this.state.finished_builds.map(this.render_finished_build.bind(this)))));
     };
     return Root;
 }(React.Component));

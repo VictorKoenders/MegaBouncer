@@ -1,7 +1,7 @@
 mod routes;
 mod websocket;
 
-use self::routes::{bundle, bundle_map, index, kill, status, trigger_build};
+use self::routes::{bundle, bundle_map, index, status};
 use self::websocket::{ws_start, WebsocketServer};
 use actix::{Addr, ArbiterService, System};
 use actix_web::{server, App};
@@ -23,10 +23,11 @@ pub fn run() {
         .resource("/bundle.js", |r| r.f(bundle))
         .resource("/bundle.js.map", |r| r.f(bundle_map))
         .resource("/api/state", |r| r.f(status))
-        .resource("/api/kill/{pid}", |r| r.f(kill))
+        .resource("/ws", |r| r.f(ws_start))
+        /*.resource("/api/kill/{pid}", |r| r.f(kill))
         .resource("/api/build/start/{project_name}/{build_name}", |r| {
             r.f(trigger_build)
-        }).resource("/ws", |r| r.f(ws_start))
+        })*/
     }).bind("127.0.0.1:8000")
     .expect("Can not bind to port 8000")
     .run();

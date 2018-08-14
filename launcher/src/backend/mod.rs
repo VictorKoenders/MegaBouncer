@@ -74,21 +74,21 @@ pub fn run(base_dir: &str) -> Result<()> {
                 let result = backend.update_running_build(index);
 
                 if result.finished {
+                    let build = backend.running_builds.remove(index);
+                    drop(index);
                     if result.finished_succesfully {
                         let mut start_build = None;
                         let mut start_process = None;
-                        if let Some(follow_up) = &backend.running_builds[index].build.after_success
+                        if let Some(follow_up) = &build.build.after_success
                         {
                             match follow_up {
                                 PostBuildEvent::Run(run_type) => {
-                                    let project_name =
-                                        backend.running_builds[index].project_name.clone();
-                                    let build = backend.running_builds[index].build.clone();
+                                    let project_name = build.project_name.clone();
+                                    let build = build.build.clone();
                                     start_process = Some((project_name, build, run_type.clone()));
                                 }
                                 PostBuildEvent::TriggerBuild { name } => {
-                                    let project_name =
-                                        backend.running_builds[index].project_name.clone();
+                                    let project_name = build.project_name.clone();
                                     start_build = Some((project_name, name.clone()));
                                 }
                             }
@@ -100,7 +100,6 @@ pub fn run(base_dir: &str) -> Result<()> {
                             backend.start_process(project_name, build, run_type)?;
                         }
                     }
-                    backend.running_builds.remove(index);
                 }
             } else if let Some(index) = backend
                 .running_processes

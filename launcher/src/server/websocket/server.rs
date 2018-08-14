@@ -1,8 +1,8 @@
-use actix::{Addr, Actor, Supervised, ArbiterService, Context, Handler};
-use std::collections::HashMap;
-use state::StateChange;
-use super::{WebsocketClient, Disconnect, Connect, BroadcastStateChange};
+use super::{BroadcastInitialState, BroadcastStateChange, Connect, Disconnect, WebsocketClient};
+use actix::{Actor, Addr, ArbiterService, Context, Handler, Supervised};
 use serde_json;
+use state::{State, StateChange};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct WebsocketServer {
@@ -41,6 +41,11 @@ impl Handler<Connect> for WebsocketServer {
     type Result = usize;
     fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> usize {
         let id = self.next_id;
+        let _ = State::get(|state| {
+            let json = serde_json::to_string(&state)?;
+            msg.client_addr.do_send(BroadcastInitialState(json));
+            Ok(())
+        });
         self.clients.insert(id, msg.client_addr);
         println!("Accepting incoming client {}", id);
         self.next_id += 1;

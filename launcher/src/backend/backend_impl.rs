@@ -29,29 +29,26 @@ impl Backend {
     }
 
     pub fn kill_process(&mut self, pid: u32) -> Result<()> {
-        if let Some(index) = self
+        for process in self
             .running_processes
-            .iter()
-            .position(|p| p.process.id() == pid)
+            .iter_mut()
+            .filter(|p| p.process.id() == pid)
         {
-            State::remove_running_process_by_pid(pid);
-            let mut process = self.running_processes.remove(index);
+            println!("Killing process {}", pid);
             process.process.kill()?;
         }
         Ok(())
     }
 
     pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
-        while let Some(index) = self
-            .running_processes
-            .iter()
-            .position(|p| p.project_name == project_name && p.build.name == build_name)
+        for process in self.running_processes
+            .iter_mut()
+            .filter(|p| p.project_name == project_name && p.build.name == build_name)
         {
-            let mut process = self.running_processes.remove(index);
             let pid = process.process.id();
             println!("Killing process {} because we're starting a new build", pid);
             process.process.kill()?;
-            State::remove_running_process_by_pid(pid);
+            // State::remove_running_process_by_pid(pid);
         }
         for b in self
             .running_builds
@@ -95,6 +92,7 @@ impl Backend {
                 self.poll
                     .register(&running_build.process, token, Ready::all(), PollOpt::edge())
             {
+                println!("Killing build {}", running_build.process.id());
                 let _ = running_build.process.kill();
                 bail!("Could not spawn {}::{}: {:?}", project_name, build.name, e);
             }
@@ -115,11 +113,11 @@ impl Backend {
         while let Some(index) = self.running_processes.iter().position(|p| {
             p.project_name == project_name && p.build.name == build.name && p.run_type == run
         }) {
-            let mut process = self.running_processes.remove(index);
+            let process = &mut self.running_processes[index];
             let pid = process.process.id();
-            println!("Killing pid {}", pid);
+            println!("Killing process {}", pid);
             process.process.kill()?;
-            State::remove_running_process_by_pid(pid);
+            // State::remove_running_process_by_pid(pid);
         }
 
         let token = Token(self.next_token);
@@ -133,6 +131,7 @@ impl Backend {
             Ready::all(),
             PollOpt::edge(),
         ) {
+            println!("Killing process {} because we could not register it with mio", running_process.process.id());
             let _ = running_process.process.kill();
             bail!(
                 "Could not spawn {}::{} {:?}: {:?}",
