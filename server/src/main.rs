@@ -44,6 +44,8 @@ extern crate uuid;
 pub mod client;
 /// The server logic
 pub mod server;
+/// Message logic
+pub mod message;
 
 use shared::mio::net::TcpListener;
 use shared::mio_poll_wrapper::Handle;

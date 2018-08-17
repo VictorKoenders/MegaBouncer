@@ -4,6 +4,7 @@ use shared::mio::Event;
 use std::io::{ErrorKind, Read, Result, Write};
 use std::net::SocketAddr;
 use uuid::Uuid;
+use message::{make_error, make_client_listening_to, FIELD_ACTION, ACTION_NODE_LIST, ACTION_NODE_REGISTER_LISTENER, ACTION_NODE_IDENTIFY};
 
 /// Holds a reference to a single connected TCP client
 #[derive(Debug)]
@@ -85,7 +86,7 @@ impl Client {
         {
             self.name = Some(name.to_string());
             Some(ClientUpdate::Identified(name.to_string()))
-        } else if let Err(e) = self.send(&::server::make_error("Missing required field 'name'")) {
+        } else if let Err(e) = self.send(&make_error("Missing required field 'name'")) {
             self.print_error(e);
             Some(ClientUpdate::Disconnect)
         } else {
@@ -101,17 +102,17 @@ impl Client {
         {
             if let Some(name) = self.name.as_ref() {
                 self.listening_to.push(channel.to_string());
-                return Some(ClientUpdate::Broadcast(::server::make_client_listening_to(
+                return Some(ClientUpdate::Broadcast(make_client_listening_to(
                     name, channel, &self.id,
                 )));
             }
-            if let Err(e) = self.send(&::server::make_error("Not identified")) {
+            if let Err(e) = self.send(&make_error("Not identified")) {
                 self.print_error(e);
                 Some(ClientUpdate::Disconnect)
             } else {
                 None
             }
-        } else if let Err(e) = self.send(&::server::make_error("Missing required field 'name'")) {
+        } else if let Err(e) = self.send(&make_error("Missing required field 'name'")) {
             self.print_error(e);
             Some(ClientUpdate::Disconnect)
         } else {
@@ -129,12 +130,12 @@ impl Client {
         };
         let action = json
             .as_object()
-            .and_then(|o| o.get("action"))
+            .and_then(|o| o.get(FIELD_ACTION))
             .and_then(|s| s.as_str());
-        if let Some("node.identify") = action {
+        if let Some(ACTION_NODE_IDENTIFY) = action {
             self.identify(&json)
         } else if self.name.is_none() {
-            if let Err(e) = self.send(&::server::make_error("Not identified")) {
+            if let Err(e) = self.send(&make_error("Not identified")) {
                 self.print_error(e);
                 Some(ClientUpdate::Disconnect)
             } else {
@@ -142,8 +143,8 @@ impl Client {
             }
         } else {
             match action {
-                Some("node.listener.register") => self.register_listener(&json),
-                Some("node.list") => Some(ClientUpdate::ListNodes),
+                Some(ACTION_NODE_REGISTER_LISTENER) => self.register_listener(&json),
+                Some(ACTION_NODE_LIST) => Some(ClientUpdate::ListNodes),
                 Some(_) => {
                     if let Some(uuid) = json.get("target").and_then(|s| s.as_str()) {
                         Some(ClientUpdate::SendTo(uuid.to_string(), json.clone()))
@@ -153,7 +154,7 @@ impl Client {
                 }
                 None => {
                     if let Err(e) =
-                        self.send(&::server::make_error("Missing required field 'action'"))
+                        self.send(&make_error("Missing required field 'action'"))
                     {
                         self.print_error(e);
                         Some(ClientUpdate::Disconnect)

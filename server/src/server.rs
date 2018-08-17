@@ -1,5 +1,8 @@
 use client::{Client, ClientUpdate};
-use serde_json::{Map, Value};
+use message::{
+    add_client_sender_to_message, make_client_disconnected, make_client_joined, make_node_list, FIELD_ACTION
+};
+use serde_json::Value;
 use shared::mio::net::TcpStream;
 use shared::mio::{Event, Token};
 use std::collections::HashMap;
@@ -53,14 +56,7 @@ impl Server {
             match update {
                 ClientUpdate::SendTo(id, mut message) => {
                     if let Some(name) = &name {
-                        message
-                            .as_object_mut()
-                            .unwrap()
-                            .insert(String::from("sender"), Value::String(name.clone()));
-                        message.as_object_mut().unwrap().insert(
-                            String::from("sender_id"),
-                            Value::String(sender_id.to_string()),
-                        );
+                        add_client_sender_to_message(&mut message, name, &sender_id)
                     }
                     let mut err = None;
                     {
@@ -82,14 +78,7 @@ impl Server {
                 }
                 ClientUpdate::Broadcast(mut message) => {
                     if let Some(name) = &name {
-                        message
-                            .as_object_mut()
-                            .unwrap()
-                            .insert(String::from("sender"), Value::String(name.clone()));
-                        message.as_object_mut().unwrap().insert(
-                            String::from("sender_id"),
-                            Value::String(sender_id.to_string()),
-                        );
+                        add_client_sender_to_message(&mut message, name, &sender_id);
                     }
                     self.broadcast(&message);
                 }
@@ -97,7 +86,7 @@ impl Server {
                     self.broadcast(&make_client_joined(&name, &sender_id));
                 }
                 ClientUpdate::ListNodes => {
-                    let message = self.get_list();
+                    let message = make_node_list(self.clients.values());
                     let name;
                     let id;
                     if let Some(client) = self.clients.get_mut(&token) {
@@ -129,7 +118,7 @@ impl Server {
     fn broadcast(&mut self, message: &Value) {
         let action = if let Some(action) = message
             .as_object()
-            .and_then(|o| o.get("action").and_then(|s| s.as_str()))
+            .and_then(|o| o.get(FIELD_ACTION).and_then(|s| s.as_str()))
         {
             action
         } else {
@@ -160,91 +149,4 @@ impl Server {
             }
         }
     }
-
-    /// Get a JSON object that contains info on the currently connected clients
-    fn get_list(&self) -> Value {
-        Value::Object({
-            let mut map = Map::new();
-            map.insert(
-                String::from("action"),
-                Value::String(String::from("node.listed")),
-            );
-            map.insert(
-                String::from("nodes"),
-                Value::Array(
-                    self.clients
-                        .values()
-                        .filter_map(|c| {
-                            let mut map = Map::new();
-                            map.insert(String::from("id"), Value::String(c.id.to_string()));
-                            map.insert(String::from("name"), Value::String(c.name.clone()?));
-                            map.insert(
-                                String::from("channels"),
-                                Value::Array(
-                                    c.listening_to.iter().cloned().map(Value::String).collect(),
-                                ),
-                            );
-                            Some(Value::Object(map))
-                        }).collect(),
-                ),
-            );
-            map
-        })
-    }
-}
-
-/// Create an error object with the given name
-pub fn make_error(msg: &str) -> Value {
-    Value::Object({
-        let mut map = Map::new();
-        map.insert(String::from("action"), Value::String(String::from("error")));
-        map.insert(String::from("message"), Value::String(String::from(msg)));
-        map
-    })
-}
-
-/// Create an "node.identified" object with the given name and id
-pub fn make_client_joined(name: &str, uuid: &Uuid) -> Value {
-    Value::Object({
-        let mut map = Map::new();
-        map.insert(
-            String::from("action"),
-            Value::String(String::from("node.identified")),
-        );
-        map.insert(String::from("name"), Value::String(String::from(name)));
-        map.insert(String::from("id"), Value::String(uuid.to_string()));
-        map
-    })
-}
-
-/// Create an "node.disconnected" object with the given name and id
-pub fn make_client_disconnected(name: &str, uuid: &Uuid) -> Value {
-    Value::Object({
-        let mut map = Map::new();
-        map.insert(
-            String::from("action"),
-            Value::String(String::from("node.disconnected")),
-        );
-        map.insert(String::from("name"), Value::String(String::from(name)));
-        map.insert(String::from("id"), Value::String(uuid.to_string()));
-        map
-    })
-}
-
-/// Create an "node.channel.registered" object with the given name, channel and id
-pub fn make_client_listening_to(name: &str, channel: &str, uuid: &Uuid) -> Value {
-    Value::Object({
-        let mut map = Map::new();
-        map.insert(
-            String::from("action"),
-            Value::String(String::from("node.channel.registered")),
-        );
-        map.insert(String::from("name"), Value::String(String::from(name)));
-        map.insert(
-            String::from("channel"),
-            Value::String(String::from(channel)),
-        );
-        map.insert(String::from("id"), Value::String(uuid.to_string()));
-        map
-    })
 }
