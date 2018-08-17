@@ -6,9 +6,9 @@ extern crate shared;
 
 mod web_server;
 
-#[cfg(platform = "linux")]
+#[cfg(target_os = "linux")]
 const OPEN_COMMAND: &str = "xdg-open";
-#[cfg(platform = "windows")]
+#[cfg(target_os = "windows")]
 const OPEN_COMMAND: &str = "start";
 
 fn main() {

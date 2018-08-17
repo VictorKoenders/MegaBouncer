@@ -3,7 +3,8 @@ use actix_web::fs::NamedFile;
 use actix_web::http::Method;
 use actix_web::{ws, App, HttpRequest, Result};
 use futures::future::Future;
-use std::thread::{sleep_ms, spawn};
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 
 const INDEX_FILE: &str = "ui/index.html";
 const DIST_FILE: &str = "ui/dist/bundle.js";
@@ -61,7 +62,7 @@ pub fn serve() -> String {
     let (addr, url) = receiver.recv().unwrap();
     println!("Server listening on {}", addr);
     while !server_is_up(&mut system, url.clone()) {
-        sleep_ms(1000);
+        sleep(Duration::from_secs(1));
     }
     url
 }
