@@ -27,4 +27,3 @@ pub const ACTION_RESPONSE_NODE_REGISTER_LISTENER: &str = "node.channel.registere
 
 /// An event triggered by the server when a node is disconnected
 pub const EVENT_NODE_DISCONNECTED: &str = "node.disconnected";
-

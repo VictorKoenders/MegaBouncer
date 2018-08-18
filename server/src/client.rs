@@ -1,10 +1,13 @@
+use message::{
+    make_client_listening_to, make_error, ACTION_NODE_IDENTIFY, ACTION_NODE_LIST,
+    ACTION_NODE_REGISTER_LISTENER, FIELD_ACTION,
+};
 use serde_json::{to_vec, Value};
 use shared::mio::net::TcpStream;
 use shared::mio::Event;
 use std::io::{ErrorKind, Read, Result, Write};
 use std::net::SocketAddr;
 use uuid::Uuid;
-use message::{make_error, make_client_listening_to, FIELD_ACTION, ACTION_NODE_LIST, ACTION_NODE_REGISTER_LISTENER, ACTION_NODE_IDENTIFY};
 
 /// Holds a reference to a single connected TCP client
 #[derive(Debug)]
@@ -56,14 +59,14 @@ impl Client {
 
     fn process_write(&mut self) -> Result<()> {
         loop {
-            if self.write_buff.len() == 0 {
+            if self.write_buff.is_empty() {
                 self.is_writable = true;
                 return Ok(());
             }
             return match self.stream.write(&self.write_buff) {
                 Ok(n) => {
                     self.write_buff.drain(..n);
-                    if self.write_buff.len() == 0 {
+                    if self.write_buff.is_empty() {
                         self.is_writable = true;
                         return Ok(());
                     }
@@ -153,9 +156,7 @@ impl Client {
                     }
                 }
                 None => {
-                    if let Err(e) =
-                        self.send(&make_error("Missing required field 'action'"))
-                    {
+                    if let Err(e) = self.send(&make_error("Missing required field 'action'")) {
                         self.print_error(e);
                         Some(ClientUpdate::Disconnect)
                     } else {

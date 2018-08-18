@@ -32,11 +32,11 @@ fn listen(update: &mut ChannelUpdate<State>) {
         Some(Value::Number(p)) => p.as_u64().unwrap_or_else(|| 0) as u16,
         _ => return,
     };
-    if let Some(_) = update
+    if update
         .state
         .connections
         .iter()
-        .find(|c| &c.host == host && c.port == port)
+        .any(|c| &c.host == host && c.port == port)
     {
         status(update);
         return;
@@ -92,7 +92,7 @@ impl State {
         let index = if let Some(index) = self
             .connections
             .iter()
-            .position(|c| &c.host == host && c.port == port)
+            .position(|c| c.host == host && c.port == port)
         {
             index
         } else {

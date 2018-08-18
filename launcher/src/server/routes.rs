@@ -1,7 +1,7 @@
 use super::ServerState;
 use actix_web::{fs::NamedFile, HttpRequest, Responder};
-use state::State;
 use serde_json;
+use state::State;
 
 /*
 #[deprecated(note = "Use websockets instead")]

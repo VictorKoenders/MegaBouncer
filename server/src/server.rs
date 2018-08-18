@@ -1,6 +1,7 @@
 use client::{Client, ClientUpdate};
 use message::{
-    add_client_sender_to_message, make_client_disconnected, make_client_joined, make_node_list, FIELD_ACTION
+    add_client_sender_to_message, make_client_disconnected, make_client_joined, make_node_list,
+    FIELD_ACTION,
 };
 use serde_json::Value;
 use shared::mio::net::TcpStream;
@@ -39,7 +40,7 @@ impl Server {
         if updates.iter().any(|u| u.is_disconnect()) {
             self.clients.remove(&event.token());
         }
-        self.handle_updates(updates, event.token(), name, id);
+        self.handle_updates(updates, event.token(), &name, id);
     }
 
     /// Handle a list of updates that were received from a client.
@@ -49,7 +50,7 @@ impl Server {
         &mut self,
         updates: Vec<ClientUpdate>,
         token: Token,
-        name: Option<String>,
+        name: &Option<String>,
         sender_id: Uuid,
     ) {
         for update in updates {
@@ -135,7 +136,7 @@ impl Server {
                     } else {
                         None
                     };
-                    clients_failed.push((token.clone(), val));
+                    clients_failed.push((*token, val));
                 }
             }
         }

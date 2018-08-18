@@ -140,7 +140,7 @@ impl State {
         if let Some(running_process) = state.running_processes.iter_mut().find(|b| b.pid == pid) {
             running_process.stdout += addition;
             msg = Some(StateChange::RunningProcessStdout(
-                running_process.uuid.clone(),
+                running_process.uuid,
                 addition.to_string(),
             ));
         }
@@ -155,7 +155,7 @@ impl State {
         if let Some(running_process) = state.running_processes.iter_mut().find(|b| b.pid == pid) {
             running_process.stderr += addition;
             msg = Some(StateChange::RunningProcessStderr(
-                running_process.uuid.clone(),
+                running_process.uuid,
                 addition.to_string(),
             ));
         }
@@ -171,7 +171,7 @@ impl State {
             let err = format!("{}", err);
             let mut process: FinishedProcess = process.into();
             process.error = Some(err.clone());
-            state.emit_change(StateChange::RunningProcessTerminated(process.uuid.clone(), err));
+            state.emit_change(StateChange::RunningProcessTerminated(process.uuid, err));
             state.finished_processes.insert(0, process);
         }
     }
@@ -182,7 +182,7 @@ impl State {
             let mut process = state.running_processes.remove(index);
             let mut process: FinishedProcess = process.into();
             process.status = status;
-            state.emit_change(StateChange::RunningProcessFinished(process.uuid.clone(), status));
+            state.emit_change(StateChange::RunningProcessFinished(process.uuid, status));
             state.finished_processes.insert(0, process);
         }
     }
@@ -202,7 +202,7 @@ impl State {
         if let Some(running_build) = state.running_builds.iter_mut().find(|b| b.pid == pid) {
             running_build.stdout += addition;
             msg = Some(StateChange::RunningBuildStdout(
-                running_build.uuid.clone(),
+                running_build.uuid,
                 addition.to_string(),
             ));
         }
@@ -217,7 +217,7 @@ impl State {
         if let Some(running_build) = state.running_builds.iter_mut().find(|b| b.pid == pid) {
             running_build.stderr += addition;
             msg = Some(StateChange::RunningBuildStderr(
-                running_build.uuid.clone(),
+                running_build.uuid,
                 addition.to_string(),
             ));
         }
@@ -234,7 +234,7 @@ impl State {
             let err = format!("{}", err);
             finished_build.error = Some(err.clone());
             state.emit_change(StateChange::RunningBuildTerminated(
-                finished_build.uuid.clone(),
+                finished_build.uuid,
                 err,
             ));
             state.finished_builds.insert(0, finished_build);
@@ -246,10 +246,7 @@ impl State {
         if let Some(index) = state.running_builds.iter().position(|b| b.pid == pid) {
             let mut process: FinishedBuild = state.running_builds.remove(index).into();
             process.status = status;
-            state.emit_change(StateChange::RunningBuildFinished(
-                process.uuid.clone(),
-                status,
-            ));
+            state.emit_change(StateChange::RunningBuildFinished(process.uuid, status));
             state.finished_builds.insert(0, process);
         }
     }

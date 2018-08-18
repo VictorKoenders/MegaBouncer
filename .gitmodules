@@ -5,7 +5,4 @@
 [submodule "mio-child-process"]
 	path = libs/mio-child-process
 	url = https://github.com/trangar/mio-child-process
-[submodule "libs/yew"]
-	path = libs/yew
-	url = http://github.com/victorkoenders/yew
-	branch = websocketservice_debug
+	

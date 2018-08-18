@@ -9,5 +9,4 @@ members = [
 	"tcp_connector",
 	"libs/mio-child-process",
 	"libs/mio-poll-wrapper",
-	"libs/yew",
 ]

@@ -42,10 +42,10 @@ extern crate uuid;
 
 /// holds a reference to the clients connected to the server
 pub mod client;
-/// The server logic
-pub mod server;
 /// Message logic
 pub mod message;
+/// The server logic
+pub mod server;
 
 use shared::mio::net::TcpListener;
 use shared::mio_poll_wrapper::Handle;

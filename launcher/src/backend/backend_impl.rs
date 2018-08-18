@@ -40,8 +40,9 @@ impl Backend {
         Ok(())
     }
 
-    pub fn start_build(&mut self, project_name: String, build_name: String) -> Result<()> {
-        for process in self.running_processes
+    pub fn start_build(&mut self, project_name: &str, build_name: &str) -> Result<()> {
+        for process in self
+            .running_processes
             .iter_mut()
             .filter(|p| p.project_name == project_name && p.build.name == build_name)
         {
@@ -85,7 +86,7 @@ impl Backend {
             let token = Token(self.next_token);
             self.next_token += 1;
             let mut running_build =
-                BackendRunningBuild::new(project_name.clone(), build.clone(), token)?;
+                BackendRunningBuild::new(project_name.to_owned(), build.clone(), token)?;
             let id = running_build.process.id();
 
             if let Err(e) =
@@ -96,7 +97,7 @@ impl Backend {
                 let _ = running_build.process.kill();
                 bail!("Could not spawn {}::{}: {:?}", project_name, build.name, e);
             }
-            State::add_running_build(project_name.clone(), build.name.clone(), id);
+            State::add_running_build(project_name.to_owned(), build.name.clone(), id);
             running_build
         };
         self.running_builds.push(build);
@@ -106,7 +107,7 @@ impl Backend {
     pub fn start_process(
         &mut self,
         project_name: String,
-        build: Build,
+        build: &Build,
         run: RunType,
     ) -> Result<()> {
         println!("Starting {}::{} {:?}", project_name, build.name, run);
@@ -131,7 +132,10 @@ impl Backend {
             Ready::all(),
             PollOpt::edge(),
         ) {
-            println!("Killing process {} because we could not register it with mio", running_process.process.id());
+            println!(
+                "Killing process {} because we could not register it with mio",
+                running_process.process.id()
+            );
             let _ = running_process.process.kill();
             bail!(
                 "Could not spawn {}::{} {:?}: {:?}",

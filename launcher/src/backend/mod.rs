@@ -55,7 +55,7 @@ pub fn run(base_dir: &str) -> Result<()> {
                             project_name,
                             build_name,
                         } => {
-                            if let Err(e) = backend.start_build(project_name, build_name) {
+                            if let Err(e) = backend.start_build(&project_name, &build_name) {
                                 State::report_error(&e);
                             }
                         }
@@ -75,12 +75,10 @@ pub fn run(base_dir: &str) -> Result<()> {
 
                 if result.finished {
                     let build = backend.running_builds.remove(index);
-                    drop(index);
                     if result.finished_succesfully {
                         let mut start_build = None;
                         let mut start_process = None;
-                        if let Some(follow_up) = &build.build.after_success
-                        {
+                        if let Some(follow_up) = &build.build.after_success {
                             match follow_up {
                                 PostBuildEvent::Run(run_type) => {
                                     let project_name = build.project_name.clone();
@@ -94,10 +92,10 @@ pub fn run(base_dir: &str) -> Result<()> {
                             }
                         }
                         if let Some((project_name, build_name)) = start_build {
-                            backend.start_build(project_name, build_name)?;
+                            backend.start_build(&project_name, &build_name)?;
                         }
                         if let Some((project_name, build, run_type)) = start_process {
-                            backend.start_process(project_name, build, run_type)?;
+                            backend.start_process(project_name, &build, run_type)?;
                         }
                     }
                 }
@@ -194,7 +192,7 @@ pub fn get_projects(base_dir: &str) -> Result<Vec<Project>> {
             Some(n) => n,
             None => continue,
         };
-        if name.starts_with(".") {
+        if name.starts_with('.') {
             continue;
         }
         result.extend(get_projects_in_dir(&dir.path())?);

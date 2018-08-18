@@ -55,7 +55,10 @@ pub fn make_node_list<'a>(nodes: impl Iterator<Item = &'a Client>) -> Value {
 pub fn make_error(msg: &str) -> Value {
     Value::Object({
         let mut map = Map::new();
-        map.insert(String::from(FIELD_ACTION), Value::String(String::from("error")));
+        map.insert(
+            String::from(FIELD_ACTION),
+            Value::String(String::from("error")),
+        );
         map.insert(String::from("message"), Value::String(String::from(msg)));
         map
     })
